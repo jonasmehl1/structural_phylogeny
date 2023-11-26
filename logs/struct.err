@@ -1,0 +1,447 @@
+Set GNU compilers as MPI wrappers backend 
+load PCRE2/10.39 (LD_LIBRARY_PATH, C_INCLUDE_PATH, MANPATH) 
+load R/4.2.0 (PATH, MANPATH, LD_LIBRARY_PATH, LIBRARY_PATH, PKG_CONFIG_PATH,
+C_INCLUDE_PATH, CPLUS_INCLUDE_PATH, PYTHONHOME) 
+load openssl/1.1.1o (PATH, LD_LIBRARY_PATH, MANPATH, OpenSSL_ROOT_DIR) 
+load curl/7.83.0 (PATH, LD_LIBRARY_PATH, MANPATH, C_INCLUDE_PATH,
+PKG_CONFIG_PATH) 
+load PYTHON/3.10.2 (PATH, MANPATH, LD_LIBRARY_PATH, LIBRARY_PATH,
+PKG_CONFIG_PATH, C_INCLUDE_PATH, CPLUS_INCLUDE_PATH, PYTHONHOME, PYTHONPATH) 
+load JQ/1.7 (PATH) 
+Unlocking working directory.
+Building DAG of jobs...
+Using shell: /bin/bash
+Provided cores: 48
+Rules claiming more threads will be scaled down.
+Job stats:
+job                    count
+-------------------  -------
+all                        1
+blast                      1
+blast_allvall             18
+blast_brh                  1
+check_orphans              1
+check_trees                1
+foldseek                   1
+foldseek_allvall          18
+foldseek_brh               1
+geneids_todo               1
+get_nums                   1
+get_verticality            1
+make_blastdb               1
+make_blastdb_single       18
+make_fastas                9
+make_foldseekdb            1
+make_taxidmap             18
+plot_evalues               1
+plot_trees                 1
+total                     95
+
+Select jobs to execute...
+
+[Sun Nov 26 20:02:02 2023]
+rule make_taxidmap:
+    input: data/fastas/UP000005640.fa
+    output: results/Hsap_opistho/db/UP000005640.taxid
+    jobid: 41
+    reason: Missing output files: results/Hsap_opistho/db/UP000005640.taxid
+    wildcards: code=UP000005640
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+grep ">" data/fastas/UP000005640.fa | sed 's/>//' | awk '{print $0"\t"9606}' > results/Hsap_opistho/db/UP000005640.taxid
+
+
+[Sun Nov 26 20:02:02 2023]
+rule foldseek_allvall:
+    input: data/structures/UP000005640/high_cif, data/structures/UP000515135/high_cif
+    output: results/Hsap_opistho/homology/allvall/UP000005640_UP000515135_fs.tsv, results/Hsap_opistho/homology/allvall/UP000515135_UP000005640_fs.tsv
+    log: results/Hsap_opistho/log/homology/UP000515135_UP000005640_fs.log
+    jobid: 93
+    benchmark: results/Hsap_opistho/benchmarks/homology/UP000515135_UP000005640_fs.txt
+    reason: Missing output files: results/Hsap_opistho/homology/allvall/UP000515135_UP000005640_fs.tsv, results/Hsap_opistho/homology/allvall/UP000005640_UP000515135_fs.tsv; Set of input files has changed since last execution
+    wildcards: seed=UP000005640, code=UP000515135
+    threads: 4
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+foldseek easy-search data/structures/UP000005640/high_cif data/structures/UP000515135/high_cif results/Hsap_opistho/homology/allvall/UP000005640_UP000515135_fs.tsv $TMPDIR/UP000005640_UP000515135 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000515135_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000005640_UP000515135_fs.tsv
+
+foldseek easy-search data/structures/UP000515135/high_cif data/structures/UP000005640/high_cif results/Hsap_opistho/homology/allvall/UP000515135_UP000005640_fs.tsv $TMPDIR/UP000515135_UP000005640 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000515135_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000515135_UP000005640_fs.tsv
+
+
+[Sun Nov 26 20:02:02 2023]
+rule make_foldseekdb:
+    input: data/structures/UP000006548/high_cif, data/structures/UP000002195/high_cif, data/structures/UP000053201/high_cif, data/structures/UP000000561/high_cif, data/structures/UP000001805/high_cif, data/structures/UP000054560/high_cif, data/structures/UP000008743/high_cif, data/structures/UP000001357/high_cif, data/structures/UP000007879/high_cif, data/structures/UP000009022/high_cif, data/structures/UP000001593/high_cif, data/structures/UP000594262/high_cif, data/structures/UP000000305/high_cif, data/structures/UP000014760/high_cif, data/structures/UP000007110/high_cif, data/structures/UP000515135/high_cif, data/structures/UP000001038/high_cif, data/structures/UP000005640/high_cif
+    output: results/Hsap_opistho/db/all_seqs_fsdb
+    jobid: 77
+    reason: Missing output files: results/Hsap_opistho/db/all_seqs_fsdb; Set of input files has changed since last execution
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+structsdir=$(dirname results/Hsap_opistho/db/all_seqs_fsdb)/structs
+mkdir -p $structsdir
+
+for id in data/structures/UP000006548/high_cif data/structures/UP000002195/high_cif data/structures/UP000053201/high_cif data/structures/UP000000561/high_cif data/structures/UP000001805/high_cif data/structures/UP000054560/high_cif data/structures/UP000008743/high_cif data/structures/UP000001357/high_cif data/structures/UP000007879/high_cif data/structures/UP000009022/high_cif data/structures/UP000001593/high_cif data/structures/UP000594262/high_cif data/structures/UP000000305/high_cif data/structures/UP000014760/high_cif data/structures/UP000007110/high_cif data/structures/UP000515135/high_cif data/structures/UP000001038/high_cif data/structures/UP000005640/high_cif; do
+bn=$(echo $id | rev | cut -f2 -d'/' | rev)
+ln -s -f -r $id $structsdir/$bn
+done
+
+foldseek createdb $structsdir results/Hsap_opistho/db/all_seqs_fsdb
+
+
+[Sun Nov 26 20:02:02 2023]
+rule make_taxidmap:
+    input: data/fastas/UP000001805.fa
+    output: results/Hsap_opistho/db/UP000001805.taxid
+    jobid: 28
+    reason: Missing output files: results/Hsap_opistho/db/UP000001805.taxid
+    wildcards: code=UP000001805
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+grep ">" data/fastas/UP000001805.fa | sed 's/>//' | awk '{print $0"\t"367110}' > results/Hsap_opistho/db/UP000001805.taxid
+
+
+[Sun Nov 26 20:02:02 2023]
+rule foldseek_allvall:
+    input: data/structures/UP000005640/high_cif, data/structures/UP000001038/high_cif
+    output: results/Hsap_opistho/homology/allvall/UP000005640_UP000001038_fs.tsv, results/Hsap_opistho/homology/allvall/UP000001038_UP000005640_fs.tsv
+    log: results/Hsap_opistho/log/homology/UP000001038_UP000005640_fs.log
+    jobid: 94
+    benchmark: results/Hsap_opistho/benchmarks/homology/UP000001038_UP000005640_fs.txt
+    reason: Missing output files: results/Hsap_opistho/homology/allvall/UP000005640_UP000001038_fs.tsv, results/Hsap_opistho/homology/allvall/UP000001038_UP000005640_fs.tsv; Set of input files has changed since last execution
+    wildcards: seed=UP000005640, code=UP000001038
+    threads: 4
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+foldseek easy-search data/structures/UP000005640/high_cif data/structures/UP000001038/high_cif results/Hsap_opistho/homology/allvall/UP000005640_UP000001038_fs.tsv $TMPDIR/UP000005640_UP000001038 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000001038_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000005640_UP000001038_fs.tsv
+
+foldseek easy-search data/structures/UP000001038/high_cif data/structures/UP000005640/high_cif results/Hsap_opistho/homology/allvall/UP000001038_UP000005640_fs.tsv $TMPDIR/UP000001038_UP000005640 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000001038_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000001038_UP000005640_fs.tsv
+
+
+[Sun Nov 26 20:02:02 2023]
+rule make_taxidmap:
+    input: data/fastas/UP000008743.fa
+    output: results/Hsap_opistho/db/UP000008743.taxid
+    jobid: 30
+    reason: Missing output files: results/Hsap_opistho/db/UP000008743.taxid
+    wildcards: code=UP000008743
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+grep ">" data/fastas/UP000008743.fa | sed 's/>//' | awk '{print $0"\t"595528}' > results/Hsap_opistho/db/UP000008743.taxid
+
+
+[Sun Nov 26 20:02:02 2023]
+rule foldseek_allvall:
+    input: data/structures/UP000005640/high_cif, data/structures/UP000005640/high_cif
+    output: results/Hsap_opistho/homology/allvall/UP000005640_UP000005640_fs.tsv, results/Hsap_opistho/homology/allvall/UP000005640_UP000005640_fs.tsv
+    log: results/Hsap_opistho/log/homology/UP000005640_UP000005640_fs.log
+    jobid: 95
+    benchmark: results/Hsap_opistho/benchmarks/homology/UP000005640_UP000005640_fs.txt
+    reason: Missing output files: results/Hsap_opistho/homology/allvall/UP000005640_UP000005640_fs.tsv; Set of input files has changed since last execution
+    wildcards: seed=UP000005640, code=UP000005640
+    threads: 4
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+foldseek easy-search data/structures/UP000005640/high_cif data/structures/UP000005640/high_cif results/Hsap_opistho/homology/allvall/UP000005640_UP000005640_fs.tsv $TMPDIR/UP000005640_UP000005640 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000005640_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000005640_UP000005640_fs.tsv
+
+foldseek easy-search data/structures/UP000005640/high_cif data/structures/UP000005640/high_cif results/Hsap_opistho/homology/allvall/UP000005640_UP000005640_fs.tsv $TMPDIR/UP000005640_UP000005640 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000005640_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000005640_UP000005640_fs.tsv
+
+
+[Sun Nov 26 20:02:02 2023]
+rule make_taxidmap:
+    input: data/fastas/UP000007879.fa
+    output: results/Hsap_opistho/db/UP000007879.taxid
+    jobid: 32
+    reason: Missing output files: results/Hsap_opistho/db/UP000007879.taxid
+    wildcards: code=UP000007879
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+grep ">" data/fastas/UP000007879.fa | sed 's/>//' | awk '{print $0"\t"400682}' > results/Hsap_opistho/db/UP000007879.taxid
+
+
+[Sun Nov 26 20:02:02 2023]
+rule make_taxidmap:
+    input: data/fastas/UP000001593.fa
+    output: results/Hsap_opistho/db/UP000001593.taxid
+    jobid: 34
+    reason: Missing output files: results/Hsap_opistho/db/UP000001593.taxid
+    wildcards: code=UP000001593
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+grep ">" data/fastas/UP000001593.fa | sed 's/>//' | awk '{print $0"\t"45351}' > results/Hsap_opistho/db/UP000001593.taxid
+
+
+[Sun Nov 26 20:02:02 2023]
+rule make_taxidmap:
+    input: data/fastas/UP000002195.fa
+    output: results/Hsap_opistho/db/UP000002195.taxid
+    jobid: 25
+    reason: Missing output files: results/Hsap_opistho/db/UP000002195.taxid
+    wildcards: code=UP000002195
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+grep ">" data/fastas/UP000002195.fa | sed 's/>//' | awk '{print $0"\t"44689}' > results/Hsap_opistho/db/UP000002195.taxid
+
+
+[Sun Nov 26 20:02:02 2023]
+rule foldseek_allvall:
+    input: data/structures/UP000005640/high_cif, data/structures/UP000007110/high_cif
+    output: results/Hsap_opistho/homology/allvall/UP000005640_UP000007110_fs.tsv, results/Hsap_opistho/homology/allvall/UP000007110_UP000005640_fs.tsv
+    log: results/Hsap_opistho/log/homology/UP000007110_UP000005640_fs.log
+    jobid: 92
+    benchmark: results/Hsap_opistho/benchmarks/homology/UP000007110_UP000005640_fs.txt
+    reason: Missing output files: results/Hsap_opistho/homology/allvall/UP000005640_UP000007110_fs.tsv, results/Hsap_opistho/homology/allvall/UP000007110_UP000005640_fs.tsv; Set of input files has changed since last execution
+    wildcards: seed=UP000005640, code=UP000007110
+    threads: 4
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+foldseek easy-search data/structures/UP000005640/high_cif data/structures/UP000007110/high_cif results/Hsap_opistho/homology/allvall/UP000005640_UP000007110_fs.tsv $TMPDIR/UP000005640_UP000007110 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000007110_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000005640_UP000007110_fs.tsv
+
+foldseek easy-search data/structures/UP000007110/high_cif data/structures/UP000005640/high_cif results/Hsap_opistho/homology/allvall/UP000007110_UP000005640_fs.tsv $TMPDIR/UP000007110_UP000005640 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000007110_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000007110_UP000005640_fs.tsv
+
+
+[Sun Nov 26 20:02:02 2023]
+rule foldseek_allvall:
+    input: data/structures/UP000005640/high_cif, data/structures/UP000007879/high_cif
+    output: results/Hsap_opistho/homology/allvall/UP000005640_UP000007879_fs.tsv, results/Hsap_opistho/homology/allvall/UP000007879_UP000005640_fs.tsv
+    log: results/Hsap_opistho/log/homology/UP000007879_UP000005640_fs.log
+    jobid: 86
+    benchmark: results/Hsap_opistho/benchmarks/homology/UP000007879_UP000005640_fs.txt
+    reason: Missing output files: results/Hsap_opistho/homology/allvall/UP000005640_UP000007879_fs.tsv, results/Hsap_opistho/homology/allvall/UP000007879_UP000005640_fs.tsv; Set of input files has changed since last execution
+    wildcards: seed=UP000005640, code=UP000007879
+    threads: 4
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+foldseek easy-search data/structures/UP000005640/high_cif data/structures/UP000007879/high_cif results/Hsap_opistho/homology/allvall/UP000005640_UP000007879_fs.tsv $TMPDIR/UP000005640_UP000007879 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000007879_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000005640_UP000007879_fs.tsv
+
+foldseek easy-search data/structures/UP000007879/high_cif data/structures/UP000005640/high_cif results/Hsap_opistho/homology/allvall/UP000007879_UP000005640_fs.tsv $TMPDIR/UP000007879_UP000005640 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000007879_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000007879_UP000005640_fs.tsv
+
+
+[Sun Nov 26 20:02:02 2023]
+rule foldseek_allvall:
+    input: data/structures/UP000005640/high_cif, data/structures/UP000006548/high_cif
+    output: results/Hsap_opistho/homology/allvall/UP000005640_UP000006548_fs.tsv, results/Hsap_opistho/homology/allvall/UP000006548_UP000005640_fs.tsv
+    log: results/Hsap_opistho/log/homology/UP000006548_UP000005640_fs.log
+    jobid: 78
+    benchmark: results/Hsap_opistho/benchmarks/homology/UP000006548_UP000005640_fs.txt
+    reason: Missing output files: results/Hsap_opistho/homology/allvall/UP000006548_UP000005640_fs.tsv, results/Hsap_opistho/homology/allvall/UP000005640_UP000006548_fs.tsv; Set of input files has changed since last execution
+    wildcards: seed=UP000005640, code=UP000006548
+    threads: 4
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+foldseek easy-search data/structures/UP000005640/high_cif data/structures/UP000006548/high_cif results/Hsap_opistho/homology/allvall/UP000005640_UP000006548_fs.tsv $TMPDIR/UP000005640_UP000006548 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000006548_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000005640_UP000006548_fs.tsv
+
+foldseek easy-search data/structures/UP000006548/high_cif data/structures/UP000005640/high_cif results/Hsap_opistho/homology/allvall/UP000006548_UP000005640_fs.tsv $TMPDIR/UP000006548_UP000005640 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000006548_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000006548_UP000005640_fs.tsv
+
+
+[Sun Nov 26 20:02:02 2023]
+rule foldseek_allvall:
+    input: data/structures/UP000005640/high_cif, data/structures/UP000001593/high_cif
+    output: results/Hsap_opistho/homology/allvall/UP000005640_UP000001593_fs.tsv, results/Hsap_opistho/homology/allvall/UP000001593_UP000005640_fs.tsv
+    log: results/Hsap_opistho/log/homology/UP000001593_UP000005640_fs.log
+    jobid: 88
+    benchmark: results/Hsap_opistho/benchmarks/homology/UP000001593_UP000005640_fs.txt
+    reason: Missing output files: results/Hsap_opistho/homology/allvall/UP000001593_UP000005640_fs.tsv, results/Hsap_opistho/homology/allvall/UP000005640_UP000001593_fs.tsv; Set of input files has changed since last execution
+    wildcards: seed=UP000005640, code=UP000001593
+    threads: 4
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+foldseek easy-search data/structures/UP000005640/high_cif data/structures/UP000001593/high_cif results/Hsap_opistho/homology/allvall/UP000005640_UP000001593_fs.tsv $TMPDIR/UP000005640_UP000001593 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000001593_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000005640_UP000001593_fs.tsv
+
+foldseek easy-search data/structures/UP000001593/high_cif data/structures/UP000005640/high_cif results/Hsap_opistho/homology/allvall/UP000001593_UP000005640_fs.tsv $TMPDIR/UP000001593_UP000005640 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000001593_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000001593_UP000005640_fs.tsv
+
+
+[Sun Nov 26 20:02:02 2023]
+rule foldseek_allvall:
+    input: data/structures/UP000005640/high_cif, data/structures/UP000594262/high_cif
+    output: results/Hsap_opistho/homology/allvall/UP000005640_UP000594262_fs.tsv, results/Hsap_opistho/homology/allvall/UP000594262_UP000005640_fs.tsv
+    log: results/Hsap_opistho/log/homology/UP000594262_UP000005640_fs.log
+    jobid: 89
+    benchmark: results/Hsap_opistho/benchmarks/homology/UP000594262_UP000005640_fs.txt
+    reason: Missing output files: results/Hsap_opistho/homology/allvall/UP000005640_UP000594262_fs.tsv, results/Hsap_opistho/homology/allvall/UP000594262_UP000005640_fs.tsv; Set of input files has changed since last execution
+    wildcards: seed=UP000005640, code=UP000594262
+    threads: 4
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+foldseek easy-search data/structures/UP000005640/high_cif data/structures/UP000594262/high_cif results/Hsap_opistho/homology/allvall/UP000005640_UP000594262_fs.tsv $TMPDIR/UP000005640_UP000594262 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000594262_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000005640_UP000594262_fs.tsv
+
+foldseek easy-search data/structures/UP000594262/high_cif data/structures/UP000005640/high_cif results/Hsap_opistho/homology/allvall/UP000594262_UP000005640_fs.tsv $TMPDIR/UP000594262_UP000005640 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000594262_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000594262_UP000005640_fs.tsv
+
+
+[Sun Nov 26 20:02:02 2023]
+rule foldseek_allvall:
+    input: data/structures/UP000005640/high_cif, data/structures/UP000000305/high_cif
+    output: results/Hsap_opistho/homology/allvall/UP000005640_UP000000305_fs.tsv, results/Hsap_opistho/homology/allvall/UP000000305_UP000005640_fs.tsv
+    log: results/Hsap_opistho/log/homology/UP000000305_UP000005640_fs.log
+    jobid: 90
+    benchmark: results/Hsap_opistho/benchmarks/homology/UP000000305_UP000005640_fs.txt
+    reason: Missing output files: results/Hsap_opistho/homology/allvall/UP000005640_UP000000305_fs.tsv, results/Hsap_opistho/homology/allvall/UP000000305_UP000005640_fs.tsv; Set of input files has changed since last execution
+    wildcards: seed=UP000005640, code=UP000000305
+    threads: 4
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+foldseek easy-search data/structures/UP000005640/high_cif data/structures/UP000000305/high_cif results/Hsap_opistho/homology/allvall/UP000005640_UP000000305_fs.tsv $TMPDIR/UP000005640_UP000000305 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000000305_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000005640_UP000000305_fs.tsv
+
+foldseek easy-search data/structures/UP000000305/high_cif data/structures/UP000005640/high_cif results/Hsap_opistho/homology/allvall/UP000000305_UP000005640_fs.tsv $TMPDIR/UP000000305_UP000005640 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000000305_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000000305_UP000005640_fs.tsv
+
+
+[Sun Nov 26 20:02:02 2023]
+rule foldseek_allvall:
+    input: data/structures/UP000005640/high_cif, data/structures/UP000014760/high_cif
+    output: results/Hsap_opistho/homology/allvall/UP000005640_UP000014760_fs.tsv, results/Hsap_opistho/homology/allvall/UP000014760_UP000005640_fs.tsv
+    log: results/Hsap_opistho/log/homology/UP000014760_UP000005640_fs.log
+    jobid: 91
+    benchmark: results/Hsap_opistho/benchmarks/homology/UP000014760_UP000005640_fs.txt
+    reason: Missing output files: results/Hsap_opistho/homology/allvall/UP000005640_UP000014760_fs.tsv, results/Hsap_opistho/homology/allvall/UP000014760_UP000005640_fs.tsv; Set of input files has changed since last execution
+    wildcards: seed=UP000005640, code=UP000014760
+    threads: 4
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+foldseek easy-search data/structures/UP000005640/high_cif data/structures/UP000014760/high_cif results/Hsap_opistho/homology/allvall/UP000005640_UP000014760_fs.tsv $TMPDIR/UP000005640_UP000014760 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000014760_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000005640_UP000014760_fs.tsv
+
+foldseek easy-search data/structures/UP000014760/high_cif data/structures/UP000005640/high_cif results/Hsap_opistho/homology/allvall/UP000014760_UP000005640_fs.tsv $TMPDIR/UP000014760_UP000005640 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000014760_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000014760_UP000005640_fs.tsv
+
+
+[Sun Nov 26 20:02:02 2023]
+rule make_taxidmap:
+    input: data/fastas/UP000006548.fa
+    output: results/Hsap_opistho/db/UP000006548.taxid
+    jobid: 24
+    reason: Missing output files: results/Hsap_opistho/db/UP000006548.taxid
+    wildcards: code=UP000006548
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+grep ">" data/fastas/UP000006548.fa | sed 's/>//' | awk '{print $0"\t"3702}' > results/Hsap_opistho/db/UP000006548.taxid
+
+[Sun Nov 26 20:02:02 2023]
+Finished job 41.
+1 of 95 steps (1%) done
+[Sun Nov 26 20:02:02 2023]
+Finished job 28.
+2 of 95 steps (2%) done
+[Sun Nov 26 20:02:02 2023]
+Finished job 30.
+3 of 95 steps (3%) done
+[Sun Nov 26 20:02:02 2023]
+Finished job 34.
+4 of 95 steps (4%) done
+[Sun Nov 26 20:02:02 2023]
+Finished job 32.
+5 of 95 steps (5%) done
+Select jobs to execute...
+
+[Sun Nov 26 20:02:02 2023]
+rule make_taxidmap:
+    input: data/fastas/UP000053201.fa
+    output: results/Hsap_opistho/db/UP000053201.taxid
+    jobid: 26
+    reason: Missing output files: results/Hsap_opistho/db/UP000053201.taxid
+    wildcards: code=UP000053201
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+grep ">" data/fastas/UP000053201.fa | sed 's/>//' | awk '{print $0"\t"645134}' > results/Hsap_opistho/db/UP000053201.taxid
+
+
+[Sun Nov 26 20:02:02 2023]
+rule make_taxidmap:
+    input: data/fastas/UP000000561.fa
+    output: results/Hsap_opistho/db/UP000000561.taxid
+    jobid: 27
+    reason: Missing output files: results/Hsap_opistho/db/UP000000561.taxid
+    wildcards: code=UP000000561
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+grep ">" data/fastas/UP000000561.fa | sed 's/>//' | awk '{print $0"\t"237631}' > results/Hsap_opistho/db/UP000000561.taxid
+
+
+[Sun Nov 26 20:02:02 2023]
+rule get_nums:
+    input: data/input_tables/Hsapopi.csv
+    output: results/Hsap_opistho/db/db_num.tsv
+    jobid: 1
+    reason: Missing output files: results/Hsap_opistho/db/db_num.tsv; Code has changed since last execution
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+echo -e "id\tseqs\tstruct\tdiff" > results/Hsap_opistho/db/db_num.tsv
+for id in $(cut -f1 data/input_tables/Hsapopi.csv); do
+    seqs=$(wc -l < data/ids/${id}.txt)
+    struct=$(find data/structures/$id/high_cif -name "*cif.gz" | wc -l)
+    echo -e "$id\t$seqs\t$struct" | awk '{print $0"\t"$2-$3}'
+done >> results/Hsap_opistho/db/db_num.tsv
+
+[Sun Nov 26 20:02:03 2023]
+Finished job 25.
+6 of 95 steps (6%) done
+Select jobs to execute...
+[Sun Nov 26 20:02:03 2023]
+Finished job 24.
+7 of 95 steps (7%) done
+
+[Sun Nov 26 20:02:03 2023]
+rule foldseek_allvall:
+    input: data/structures/UP000005640/high_cif, data/structures/UP000002195/high_cif
+    output: results/Hsap_opistho/homology/allvall/UP000005640_UP000002195_fs.tsv, results/Hsap_opistho/homology/allvall/UP000002195_UP000005640_fs.tsv
+    log: results/Hsap_opistho/log/homology/UP000002195_UP000005640_fs.log
+    jobid: 79
+    benchmark: results/Hsap_opistho/benchmarks/homology/UP000002195_UP000005640_fs.txt
+    reason: Missing output files: results/Hsap_opistho/homology/allvall/UP000005640_UP000002195_fs.tsv, results/Hsap_opistho/homology/allvall/UP000002195_UP000005640_fs.tsv; Set of input files has changed since last execution
+    wildcards: seed=UP000005640, code=UP000002195
+    threads: 4
+    resources: tmpdir=/scratch/tmp/30947921
+
+
+foldseek easy-search data/structures/UP000005640/high_cif data/structures/UP000002195/high_cif results/Hsap_opistho/homology/allvall/UP000005640_UP000002195_fs.tsv $TMPDIR/UP000005640_UP000002195 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000002195_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000005640_UP000002195_fs.tsv
+
+foldseek easy-search data/structures/UP000002195/high_cif data/structures/UP000005640/high_cif results/Hsap_opistho/homology/allvall/UP000002195_UP000005640_fs.tsv $TMPDIR/UP000002195_UP000005640 --threads 4 --max-seqs 5 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > results/Hsap_opistho/log/homology/UP000002195_UP000005640_fs.log
+sed -i 's/-model_v4.cif.gz//g' results/Hsap_opistho/homology/allvall/UP000002195_UP000005640_fs.tsv
+
+[Sun Nov 26 20:02:03 2023]
+Finished job 26.
+8 of 95 steps (8%) done
+[Sun Nov 26 20:02:03 2023]
+Finished job 27.
+9 of 95 steps (9%) done
+Select jobs to execute...
+[Sun Nov 26 20:02:04 2023]
+Finished job 1.
+10 of 95 steps (11%) done

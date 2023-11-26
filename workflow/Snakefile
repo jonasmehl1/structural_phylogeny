@@ -1,0 +1,846 @@
+import glob
+import pandas as pd
+import snakemake.utils
+
+# this is the number of seed genes to run the pipeline
+test_seeds=5
+# PARAMS
+# minimum length of seed protein to keep
+min_len = 0
+# target per queries in both foldseek and blast
+target_seqs=1000
+max_seqs_brh = 5
+# blast evalue
+eval_blast = 1e-3
+eval_fs = 1e-3
+eval_both = 1e-3
+eval_brh = 10
+# how many sequence max to do the tree?
+max_seqs = 150
+# trimal parameters
+trimal_cons = 30
+trimal_gt = 0.1
+# if trimmed aln shorter than this exclude
+# min_trim_len = 30
+# Ultrafast bootstrap for iqtree
+UF_boot = 1000
+# min lddt to mask residues
+min_lddt = 50
+
+#type of diff matrixed for foldtree
+# mattypes = ['fident', 'alntmscore', 'lddt']
+methods = ['blast', 'fs']
+blast_common = ['blast', 'common']
+fs_common = ['fs', 'common']
+
+subst_matrix = "data/subst_matrixes/mat3di.out"
+
+# FOLDERS
+sequence_dir = 'data/fastas/'
+structure_dir = 'data/structures/'
+outdir = 'results/'
+
+dataset=config['name_dataset']
+input_table = pd.read_csv(config['input_table_file'], header=None, sep='\t')
+input_table.columns = ['uniprot', 'taxid', 'count1', 'count2', 'count3', 'genome', 'source', 'species', 'mnemo']
+input_dict = input_table.set_index('uniprot').T.to_dict()
+
+codes = list(input_table['uniprot'])
+
+seed_sps=config['seed']
+
+# possible combinations:
+combinations_codes_str=[x+"_"+y for x in codes for y in codes]
+
+rule all:
+    input:
+        outdir+dataset+'/db/db_num.tsv',
+        # outdir+dataset+"/db/all_seqs_fsdb_ss.fa",
+        # outdir+dataset+'/db/db_lddt.tsv',
+        expand(sequence_dir+'{code}.fa', code=codes),
+        # expand(outdir+dataset+"/homology/allvall/{comb}_{method}.tsv", comb=combinations_codes_str, method=methods),
+        expand(outdir+dataset+"/homology/{seed}_{method}_brh.tsv", seed=seed_sps, method=methods),
+        # expand(outdir+dataset+"/homology/{seed}_{method}.tsv", seed=seed_sps, method=methods),
+        expand(outdir+dataset+"/plots/"+dataset+"_{seed}_eda.png", seed=seed_sps),
+        expand(outdir+dataset+"/plots/"+dataset+"_{seed}_trees.png", seed=seed_sps),
+        expand(outdir+dataset+"/trees/{seed}_fs_structtrees.txt", seed=seed_sps),
+        expand(outdir+dataset+"/trees/{seed}_fs_foldtrees.txt", seed=seed_sps),
+        expand(outdir+dataset+"/trees/{seed}_blast_trees.txt", seed=seed_sps),
+        expand(outdir+dataset+"/reco/{seed}_scores.tsv", seed=seed_sps)
+
+
+rule get_nums:
+    input: config['input_table_file']
+    output: outdir+dataset+'/db/db_num.tsv'
+    shell:'''
+echo -e "id\\tseqs\\tstruct\\tdiff" > {output}
+for id in $(cut -f1 {input}); do
+    seqs=$(wc -l < data/ids/${{id}}.txt)
+    struct=$(find data/structures/$id/high_cif -name "*cif.gz" | wc -l)
+    echo -e "$id\\t$seqs\\t$struct" | awk '{{print $0"\\t"$2-$3}}'
+done >> {output}
+'''
+
+
+# rule merge_lddts:
+#     input: expand(outdir+dataset+'/db/db_lddt_{code}.tsv', code=codes)
+#     output: outdir+dataset+'/db/db_lddt.tsv'
+#     shell:'''
+# echo -e "proteome\\tprotein\\tmean_lddt" > {output}
+# cat {input} >> {output}
+# '''
+
+rule make_fastas:
+    input: structure_dir+'{code}/high_cif'
+    output: sequence_dir+'{code}.fa'
+    threads: 8
+    shell:'''
+python ./scripts/cif2fasta.py -i {input} -o {output} -c {threads} -l {min_len}
+'''
+# BeEM may still be useful
+
+rule make_taxidmap:
+    input: rules.make_fastas.output
+    output: temp(outdir+dataset+'/db/{code}.taxid')
+    params:
+        taxid=lambda wcs: str(input_dict[wcs.code]['taxid'])
+    shell:'''
+grep ">" {input} | sed 's/>//' | awk '{{print $0"\\t"{params.taxid}}}' > {output}
+'''
+
+rule make_blastdb:
+    input:
+        fa=expand(sequence_dir+'{code}.fa', code=codes),
+        maps=expand(outdir+dataset+'/db/{code}.taxid', code=codes)
+    output:
+        fa=outdir+dataset+"/db/all_seqs.fa",
+        blast=outdir+dataset+"/db/all_seqs_blastdb.pdb",
+        mapid=outdir+dataset+"/db/taxidmap"
+    shell:'''
+cat {input.maps} > {output.mapid}
+cat {input.fa} > {output.fa}
+out_file=$(echo {output.blast} | rev | cut -f 2- -d '.' | rev)
+makeblastdb -in {output.fa} -out $out_file -parse_seqids -taxid_map {output.mapid} -dbtype prot
+'''
+
+rule make_foldseekdb:
+    input:
+        all_struct=expand(structure_dir+'{code}/high_cif', code=codes),
+    output:
+        outdir+dataset+"/db/all_seqs_fsdb"
+    shell:'''
+structsdir=$(dirname {output})/structs
+mkdir -p $structsdir
+
+for id in {input}; do
+bn=$(echo $id | rev | cut -f2 -d'/' | rev)
+ln -s -f -r $id $structsdir/$bn
+done
+
+foldseek createdb $structsdir {output}
+'''
+
+rule make_foldseekdb_seq:
+    input: rules.make_foldseekdb.output
+    output: outdir+dataset+"/db/all_seqs_fsdb_ss.fa"
+    shell:'''
+foldseek lndb {input}_h {input}_ss_h
+foldseek convert2fasta {input}_ss {output}
+sed -i 's/-model_v4.cif.gz//g' {output}
+'''
+
+rule make_blastdb_single:
+    input:
+        fa=rules.make_fastas.output,
+        mapid=rules.make_blastdb.output.mapid
+    output:
+        outdir+dataset+"/db/single_dbs/{code}.pdb"
+    shell:'''
+out_file=$(echo {output} | rev | cut -f 2- -d '.' | rev)
+makeblastdb -in {input.fa} -out $out_file -parse_seqids -taxid_map {input.mapid} -dbtype prot
+'''
+
+rule make_foldseekdb_single:
+    input: structure_dir+'{code}/high_cif',
+    output: outdir+dataset+"/db/single_dbs/{code}_fsdb"
+    shell:'''
+foldseek createdb {input} {output}
+'''
+
+rule blast:
+    input:
+        q=sequence_dir+'{seed}.fa',
+        db=rules.make_blastdb.output.blast,
+    output: outdir+dataset+"/homology/{seed}_blast.tsv"
+    benchmark: outdir+dataset+"/benchmarks/homology/{seed}_blast.txt"
+    threads:
+        24
+    shell:'''
+dbfile=$(echo {input.db} | rev | cut -f 2- -d '.' | rev)
+blastp -query {input.q} -db $dbfile -out {output} -max_hsps 1 -max_target_seqs {target_seqs} \
+-outfmt "6 std qcovs qcovhsp qlen slen staxids" -num_threads {threads}
+'''
+
+rule foldseek:
+    input:
+        q=structure_dir+'{seed}/high_cif',
+        db=rules.make_foldseekdb.output
+    output: 
+        outdir+dataset+"/homology/{seed}_fs.tsv"
+    log: outdir+dataset+"/log/homology/{seed}_fs.log"
+    benchmark: outdir+dataset+"/benchmarks/homology/{seed}_fs.txt"
+    threads:
+        24
+    shell:'''
+foldseek easy-search {input.q} {input.db} {output} $TMPDIR/{wildcards.seed} --threads {threads} --max-seqs {target_seqs} \
+--format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > {log}
+sed -i 's/-model_v4.cif.gz//g' {output}
+'''
+
+rule blast_allvall:
+    input:
+        q=sequence_dir+'{seed}.fa',
+        t=sequence_dir+'{code}.fa',
+        q_db=outdir+dataset+"/db/single_dbs/{seed}.pdb",
+        t_db=outdir+dataset+"/db/single_dbs/{code}.pdb",
+    output: 
+        q_t=outdir+dataset+"/homology/allvall/{seed}_{code}_blast.tsv",
+        t_q=outdir+dataset+"/homology/allvall/{code}_{seed}_blast.tsv"
+    benchmark: outdir+dataset+"/benchmarks/homology/{code}_{seed}_blast.txt"
+    threads:
+        4
+    shell:'''
+dbfile1=$(echo {input.t_db} | rev | cut -f 2- -d '.' | rev)
+blastp -query {input.q} -db $dbfile1 -out {output.q_t} \
+-outfmt "6 std qcovs qcovhsp qlen slen staxids" -num_threads {threads} -max_hsps 1 -max_target_seqs {max_seqs_brh}
+
+dbfile2=$(echo {input.q_db} | rev | cut -f 2- -d '.' | rev)
+blastp -query {input.t} -db $dbfile2 -out {output.t_q} \
+-outfmt "6 std qcovs qcovhsp qlen slen staxids" -num_threads {threads} -max_hsps 1 -max_target_seqs {max_seqs_brh}
+'''
+
+rule foldseek_allvall:
+    input:
+        # q=lambda wcs: structure_dir+wcs.comb.rsplit('_',1)[0]+'/cif',
+        # t=lambda wcs: outdir+dataset+"/db/single_dbs/"+wcs.comb.rsplit('_',1)[1]+"_fsdb"
+        q=structure_dir+'{seed}/high_cif',
+        t=structure_dir+'{code}/high_cif'
+    output:
+        q_t=outdir+dataset+"/homology/allvall/{seed}_{code}_fs.tsv",
+        t_q=outdir+dataset+"/homology/allvall/{code}_{seed}_fs.tsv"
+    log: outdir+dataset+"/log/homology/{code}_{seed}_fs.log"
+    benchmark: outdir+dataset+"/benchmarks/homology/{code}_{seed}_fs.txt"
+    threads:
+        4
+    shell:'''
+foldseek easy-search {input.q} {input.t} {output.q_t} $TMPDIR/{wildcards.seed}_{wildcards.code} \
+--threads {threads} --max-seqs {max_seqs_brh} \
+--format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > {log}
+sed -i 's/-model_v4.cif.gz//g' {output.q_t}
+
+foldseek easy-search {input.t} {input.q} {output.t_q} $TMPDIR/{wildcards.code}_{wildcards.seed} \
+--threads {threads} --max-seqs {max_seqs_brh} \
+--format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > {log}
+sed -i 's/-model_v4.cif.gz//g' {output.t_q}
+'''
+
+rule blast_brh:
+    input: 
+        a=expand(outdir+dataset+"/homology/allvall/{seed}_{code}_blast.tsv", seed=seed_sps, code=codes),
+        b=expand(outdir+dataset+"/homology/allvall/{code}_{seed}_blast.tsv", seed=seed_sps, code=codes)
+    output:
+        outdir+dataset+"/homology/{seed}_blast_brh.tsv"
+    shell:'''
+python scripts/get_BRH.py -h1 {input.a} -h2 {input.b} -o {output} -e {eval_brh}
+'''
+
+rule foldseek_brh:
+    input: 
+        a=expand(outdir+dataset+"/homology/allvall/{seed}_{code}_fs.tsv", seed=seed_sps, code=codes),
+        b=expand(outdir+dataset+"/homology/allvall/{code}_{seed}_fs.tsv", seed=seed_sps, code=codes)
+    output:
+        outdir+dataset+"/homology/{seed}_fs_brh.tsv"
+    shell:'''
+python scripts/get_BRH.py -h1 {input.a} -h2 {input.b} -o {output} -e {eval_brh}
+'''
+
+
+rule plot_evalues:
+    input:
+        table=config['input_table_file'],
+        groups=config['taxons_file'],
+        taxidmap=rules.make_blastdb.output.mapid,
+        blast=rules.blast.output,
+        blast_brh=rules.blast_brh.output,
+        self_blast=outdir+dataset+"/homology/allvall/{seed}_{seed}_blast.tsv",
+        fs=rules.foldseek.output,
+        fs_brh=rules.foldseek_brh.output,
+        self_fs=outdir+dataset+"/homology/allvall/{seed}_{seed}_fs.tsv"
+    output: 
+        eda=outdir+dataset+"/plots/"+dataset+"_{seed}_eda.png",
+        saturation=outdir+dataset+"/plots/"+dataset+"_{seed}_saturation.png"
+    shell:'''
+Rscript scripts/compare_sampling.R -i {input.table} -m {input.groups} -t {input.taxidmap} \
+-b {input.blast} -f {input.fs} --bb {input.blast_brh} --fb {input.fs_brh} \
+--sb {input.self_blast} --sf {input.self_fs} -o {output.eda} --o2 {output.saturation} -e {eval_both} -s {max_seqs}
+'''
+
+
+# first checkpoint and get the uniq ids in the blast or foldseek result
+# for each gene create a folder (ideally divided 1000 in each folder if possible (remember you have the column with number of proteins))
+checkpoint geneids_todo:
+    input:
+        blast=rules.blast.output,
+        fs=rules.foldseek.output
+    output:
+        blast=outdir+dataset+"/ids/{seed}_blast.ids",
+        fs=outdir+dataset+"/ids/{seed}_fs.ids"
+    shell:'''
+cut -f1 {input.blast} | sort -u | awk 'NR<={test_seeds}' > {output.blast}
+cut -f1 {input.fs} | sort -u | awk 'NR<={test_seeds}' > {output.fs}
+'''
+
+####### TREE PIPELINE ########
+
+##### HOMOLOGY FILTERING #####
+
+# get the targets ids and the subset homology table for fs and blast 
+rule get_ids:
+    input: outdir+dataset+"/homology/{seed}_{method}.tsv"
+    output: 
+        txt=outdir+dataset+"/seeds/{seed}/{i}/{i}.{method}",
+        ids=outdir+dataset+"/seeds/{seed}/{i}/{i}_{method}.ids"
+    shell:'''
+mkdir -p $(dirname {output.txt})
+awk '$1=="AF-{wildcards.i}-F1"' {input} | awk '$11<{eval_both}' > {output.txt}
+seed_gene=$(cut -f1 {output.txt} | sort -u)
+echo $seed_gene > {output.ids}
+n_hits=$(wc -l < {output.txt})
+if [ $n_hits -gt 1 ]; then
+    sort -gr -k12 {output.txt} | cut -f2 | grep -v -w $seed_gene | sort -u | awk 'NR < {max_seqs}' >> {output.ids}
+fi
+'''
+
+rule get_common_ids:
+    input: 
+        blast=outdir+dataset+"/seeds/{seed}/{i}/{i}_blast.ids",
+        fs=outdir+dataset+"/seeds/{seed}/{i}/{i}_fs.ids"
+    output: 
+        outdir+dataset+"/seeds/{seed}/{i}/{i}_common.ids"
+    shell:'''
+comm -12 {input.blast} {input.fs} > {output}
+'''
+
+def seeds_homology_blast(wildcards):
+    checkpoint_output = checkpoints.geneids_todo.get(**wildcards).output.blast
+    with open(checkpoint_output) as all_genes:
+        seed_genes = [gn.strip() for gn in all_genes]
+        parsed_seed_genes = [gn.split('-')[1] for gn in seed_genes]
+    return expand(outdir+dataset+"/seeds/{seed}/{i}/{i}_blast.ids", seed=wildcards.seed, i=parsed_seed_genes)
+
+def seeds_homology_fs(wildcards):
+    checkpoint_output = checkpoints.geneids_todo.get(**wildcards).output.fs
+    with open(checkpoint_output) as all_genes:
+        seed_genes = [gn.strip() for gn in all_genes]
+        parsed_seed_genes = [gn.split('-')[1] for gn in seed_genes]
+    return expand(outdir+dataset+"/seeds/{seed}/{i}/{i}_fs.ids", seed=wildcards.seed, i=parsed_seed_genes)
+
+def seeds_homology_common(wildcards):
+    checkpoint_output = checkpoints.geneids_todo.get(**wildcards).output.blast
+    with open(checkpoint_output) as all_genes:
+        seed_genes = [gn.strip() for gn in all_genes]
+        parsed_seed_genes = [gn.split('-')[1] for gn in seed_genes]
+    return expand(outdir+dataset+"/seeds/{seed}/{i}/{i}_common.ids", seed=wildcards.seed, i=parsed_seed_genes)
+
+# Skip if less then 4 target hits
+checkpoint check_orphans:
+    input: 
+        blast=seeds_homology_blast,
+        common=seeds_homology_common,
+        fs=seeds_homology_fs
+    output:
+        exclude_blast=outdir+dataset+"/ids/{seed}_blast_orphans.exclude",
+        continue_aln_blast=outdir+dataset+"/ids/{seed}_blast_aln.ids",
+        exclude_common=outdir+dataset+"/ids/{seed}_common_orphans.exclude",
+        continue_aln_common=outdir+dataset+"/ids/{seed}_common_aln.ids",
+        exclude_fs=outdir+dataset+"/ids/{seed}_fs_orphans.exclude",
+        continue_aln_fs=outdir+dataset+"/ids/{seed}_fs_aln.ids"
+    shell:'''
+> {output.exclude_blast}
+> {output.continue_aln_blast}
+for file in {input.blast}; do
+    n_hits=$(wc -l < $file)
+    if [ $n_hits -lt 4 ]; then
+        echo -e "$(basename $file '_blast.ids')\tless than 4 blast hits" >> {output.exclude_blast}
+    else
+        echo "$(basename $file '_blast.ids')" >> {output.continue_aln_blast}
+    fi
+done
+
+> {output.exclude_common}
+> {output.continue_aln_common}
+for file in {input.common}; do
+    n_hits=$(wc -l < $file)
+    if [ $n_hits -lt 4 ]; then
+        echo -e "$(basename $file '_common.ids')\tless than 4 blast hits" >> {output.exclude_common}
+    else
+        echo "$(basename $file '_common.ids')" >> {output.continue_aln_common}
+    fi
+done
+
+> {output.exclude_fs}
+> {output.continue_aln_fs}
+for file in {input.fs}; do
+    n_hits=$(wc -l < $file)
+    if [ $n_hits -lt 4 ]; then
+        echo -e "$(basename $file '_fs.ids')\tless than 4 fs hits" >> {output.exclude_fs}
+    else
+        echo "$(basename $file '_fs.ids')" >> {output.continue_aln_fs}
+    fi
+done
+'''
+
+
+###### ALIGNMENT ######
+
+rule aln_blast:
+    input: outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}.ids"
+    params:
+        blast_db=outdir+dataset+"/db/all_seqs_blastdb"
+    output:
+        unaln=outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_aa.seqs",
+        aln=outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_aa.alg"
+    log: outdir+dataset+"/log/mafft/{seed}_{i}_{mode}_aa.log"
+    benchmark: outdir+dataset+"/benchmarks/mafft/{seed}_{i}_{mode}_aa.txt"
+    wildcard_constraints:
+        mode="blast|common"
+    threads:
+        4
+    shell:'''
+blastdbcmd -db {params.blast_db} -entry_batch {input} > {output.unaln}
+mafft --auto --thread {threads} {output.unaln} > {output.aln} 2> {log}
+'''
+
+# If foldseek, retrieve sequences from "translated version"
+rule aln_foldseek:
+    input:
+        ids=outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}.ids",
+        fa=rules.make_foldseekdb_seq.output
+    output:
+        seq=outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_3Di.seqs",
+        masked=outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_3Di.masked.seqs",
+        aln=outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_3Di.alg"
+    log: outdir+dataset+"/log/mafft/{seed}_{i}_{mode}_3Di.log"
+    benchmark: outdir+dataset+"/benchmarks/mafft/{seed}_{i}_{mode}_3Di.txt"
+    wildcard_constraints:
+        mode="fs|common"
+    threads: 4
+    shell:'''
+seqkit grep -f {input.ids} {input.fa} > {output.seq}
+python scripts/mask_structures.py -i {output.seq} -o {output.masked} -m {min_lddt} -s {structure_dir}
+mafft --auto --thread {threads} --aamatrix {subst_matrix} {output.masked} > {output.aln} 2> {log}
+'''
+
+###### TRIMMING ######
+rule trim_aln:
+    input: outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.alg"
+    output: outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.alg.clean"
+    shell: '''
+trimal -in {input} -out {output} -cons {trimal_cons} -gt {trimal_gt}
+'''
+
+###### ML TREE RECONSTRUCTION ######
+
+rule iqtree:
+    input: outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.alg.clean"
+    output: 
+        tree=outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.treefile",
+        treeline=outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.treeline"
+    log: outdir+dataset+"/log/iqtree/{seed}_{i}_{mode}_{alphabet}.log"
+    benchmark: outdir+dataset+"/benchmarks/iqtree/{seed}_{i}_{mode}_{alphabet}.txt"
+    threads: 4
+    shell: '''
+tree_prefix=$(echo {output.tree} | sed 's/.treefile//')
+
+if [ {wildcards.alphabet} = "3Di" ]; then
+    model="GTR20"
+else
+    model="LG+G4"
+fi
+
+iqtree2 -s {input} --prefix $tree_prefix -B {UF_boot} -T {threads} --quiet -m $model --mem 4G --cmin 4 --cmax 10
+
+best_model=$(grep "Model of substitution:" ${{tree_prefix}}.iqtree | cut -f2 -d':' | sed 's/ //')
+loglik=$(grep "Log-likelihood of the tree:" ${{tree_prefix}}.iqtree | cut -f2 -d':' | cut -f2 -d' ')
+
+echo -e "{wildcards.i}\t$best_model\t$loglik\t$(cat {output.tree})" > {output.treeline}
+
+mv ${{tree_prefix}}.log {log}
+rm -f ${{tree_prefix}}.iqtree ${{tree_prefix}}.model.gz ${{tree_prefix}}.splits.nex ${{tree_prefix}}.contree ${{tree_prefix}}.ckp.gz
+'''
+
+rule root_mltree:
+    input: outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.treefile"
+    output: outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.treefile.rooted"
+    shell: '''
+./software/mad {input}
+sed -i \'2,$d\' {output}
+'''
+
+# final seeds for blast only the ml tree and for foldseek both foldtree and ml tree
+def seeds_tree_blast(wildcards):
+    checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln_blast
+    with open(checkpoint_output) as all_genes:
+        seed_genes = [gn.strip() for gn in all_genes]
+    return expand(outdir+dataset+"/seeds/{seed}/{i}/{i}_blast_aa.treefile.rooted", seed=wildcards.seed, i=seed_genes)
+
+def seeds_tree_common(wildcards):
+    checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln_common
+    with open(checkpoint_output) as all_genes:
+        seed_genes = [gn.strip() for gn in all_genes]
+    return expand(outdir+dataset+"/seeds/{seed}/{i}/{i}_common_aa.treefile.rooted", seed=wildcards.seed, i=seed_genes)
+
+def seeds_foldtree_fs(wildcards):
+    checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln_fs
+    with open(checkpoint_output) as all_genes:
+        seed_genes = [gn.strip() for gn in all_genes]
+    outfiles = expand(outdir+dataset+"/seeds/{seed}/{i}/{i}_fs_fident.nwk.rooted", seed=wildcards.seed, i=seed_genes)#, mattype=mattypes)
+    return outfiles
+
+def seeds_foldtree_common(wildcards):
+    checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln_fs
+    with open(checkpoint_output) as all_genes:
+        seed_genes = [gn.strip() for gn in all_genes]
+    outfiles = expand(outdir+dataset+"/seeds/{seed}/{i}/{i}_common_fident.nwk.rooted", seed=wildcards.seed, i=seed_genes)#, mattype=mattypes)
+    return outfiles
+
+def seeds_structtree_common(wildcards):
+    checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln_fs
+    with open(checkpoint_output) as all_genes:
+        seed_genes = [gn.strip() for gn in all_genes]
+    outfiles = expand(outdir+dataset+"/seeds/{seed}/{i}/{i}_common_3Di.treefile.rooted", seed=wildcards.seed, i=seed_genes)
+    return outfiles
+
+def seeds_structtree_fs(wildcards):
+    checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln_fs
+    with open(checkpoint_output) as all_genes:
+        seed_genes = [gn.strip() for gn in all_genes]
+    outfiles = expand(outdir+dataset+"/seeds/{seed}/{i}/{i}_fs_3Di.treefile.rooted", seed=wildcards.seed, i=seed_genes)
+    return outfiles
+
+##### FOLDTREE #####
+
+rule run_foldtree:
+    input: outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}.ids"
+    output:
+        allvall=outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_core_allvall.tsv",
+        distmat=outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_fident_distmat.txt",
+        tree=outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_fident.nwk"
+    wildcard_constraints:
+        mode="fs|common"
+    log: outdir+dataset+"/log/ft/{seed}_{i}_{mode}.log"
+    benchmark: outdir+dataset+"/benchmarks/ft/{seed}_{i}_{mode}.txt"
+    shell: '''
+indir=$(dirname {input})
+mkdir -p $indir/structs_{wildcards.mode}
+
+for id in $(cat {input}); do
+zcat {structure_dir}/*/high_cif/${{id}}-model_v4.cif.gz > $indir/structs_{wildcards.mode}/${{id}}.cif
+done
+
+python ./software/foldtree/foldtree.py -i $indir/structs_{wildcards.mode} -o $indir/{wildcards.i}_{wildcards.mode} \
+-t $TMPDIR/{wildcards.i}_{wildcards.mode}_ft -c $indir/{wildcards.i}_{wildcards.mode}_core \
+--corecut --correction --kernel fident > {log}
+
+rm -r $indir/structs_{wildcards.mode}
+rm -r $TMPDIR/{wildcards.i}_{wildcards.mode}_ft
+rm -r $indir/{wildcards.i}_{wildcards.mode}_core
+rm $indir/{wildcards.i}_{wildcards.mode}_fident_distmat.txt_fastme_stat.txt $indir/{wildcards.i}_{wildcards.mode}_fident_distmat.txt.tmp
+'''
+
+rule root_tree_foldtree:
+    input: outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_fident.nwk"
+    output: outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_fident.nwk.rooted"
+    wildcard_constraints:
+        mode="fs|common"
+    shell: '''
+./software/mad {input}
+sed -i \'2,$d\' {output}
+'''
+##### FINAL CHECK IF TREE WORKED #######
+
+checkpoint check_trees:
+    input: 
+        blast=seeds_tree_blast,
+        fs=seeds_structtree_fs,
+        ft=seeds_foldtree_fs,
+        seq_common=seeds_tree_common,
+        structtree_common=seeds_structtree_common,
+        ft_common=seeds_foldtree_common
+    output:
+        ids_blast=outdir+dataset+"/ids/{seed}_blast_finished.ids",
+        trees_blast=outdir+dataset+"/trees/{seed}_blast_trees.txt",
+        ids_fs=outdir+dataset+"/ids/{seed}_fs_finished.ids",
+        trees_fs=outdir+dataset+"/trees/{seed}_fs_structtrees.txt",
+        ids_ft=outdir+dataset+"/ids/{seed}_fs_foldtree.ids",
+        trees_ft=outdir+dataset+"/trees/{seed}_fs_foldtrees.txt",
+        ids_common_seq=outdir+dataset+"/ids/{seed}_common_seq_finished.ids",
+        trees_common_seq=outdir+dataset+"/trees/{seed}_common_trees.txt",
+        ids_common_structtree=outdir+dataset+"/ids/{seed}_common_structtrees_finished.ids",
+        trees_common_structtree=outdir+dataset+"/trees/{seed}_common_structtrees.txt",
+        ids_common_ft=outdir+dataset+"/ids/{seed}_common_foldtree.ids",
+        trees_common_ft=outdir+dataset+"/trees/{seed}_common_foldtrees.txt"
+    shell:'''
+> {output.ids_blast}
+> {output.trees_blast}
+for file in {input.blast}; do
+    id=$(basename $file "_blast_aa.treefile.rooted")
+    echo $id >> {output.ids_blast}
+    echo -e "$id\t$(cat $file)" >> {output.trees_blast}
+done
+
+> {output.ids_fs}
+> {output.trees_fs}
+for file in {input.fs}; do
+    id=$(basename $file "_fs_3Di.treefile.rooted")
+    echo $id >> {output.ids_fs}
+    echo -e "$id\t$(cat $file)" >> {output.trees_fs}
+done
+
+> {output.trees_ft}
+> {output.ids_ft}
+for file in {input.ft}; do
+    id=$(basename $file "_fs_fident.nwk.rooted")
+    echo $id >> {output.ids_ft}
+    echo -e "$id\t$(cat $file)" >> {output.trees_ft}
+done
+
+> {output.trees_common_seq}
+> {output.ids_common_seq}
+for file in {input.seq_common}; do
+    id=$(basename $file "_common_aa.treefile.rooted")
+    echo $id >> {output.ids_common_seq}
+    echo -e "$id\t$(cat $file)" >> {output.trees_common_seq}
+done
+
+> {output.trees_common_structtree}
+> {output.ids_common_structtree}
+for file in {input.structtree_common}; do
+    id=$(basename $file "_common_3Di.treefile.rooted")
+    echo $id >> {output.ids_common_structtree}
+    echo -e "$id\t$(cat $file)" >> {output.trees_common_structtree}
+done
+
+> {output.trees_common_ft}
+> {output.ids_common_ft}
+for file in {input.ft_common}; do
+    id=$(basename $file "_common_fident.nwk.rooted")
+    echo $id >> {output.ids_common_ft}
+    echo -e "$id\t$(cat $file)" >> {output.trees_common_ft}
+done
+
+'''
+
+### Comparisons
+
+rule get_verticality:
+    input: 
+        foldtrees=rules.check_trees.output.trees_common_ft,
+        structtrees=rules.check_trees.output.trees_common_structtree,
+        seqtrees=rules.check_trees.output.trees_common_seq,
+        table=config['input_table_file'],
+        taxidmap=rules.make_blastdb.output.mapid,
+        sptree=config['species_tree']
+    output:
+        lineage=temp(outdir+dataset+"/reco/{seed}_lineage.tsv"),
+        table=outdir+dataset+"/reco/{seed}_scores.tsv"
+    shell:'''
+cut -f2,9 {input.table} | taxonkit reformat -I 1 | sed 's/;/,/g' > {output.lineage}
+python software/foldtree/compute_scores.py --trees {input.foldtrees} {input.structtrees} {input.seqtrees} \
+--tax {input.taxidmap} --sptree {input.sptree} --out {output.table} -l {output.lineage}
+'''
+
+
+rule plot_trees:
+    input: 
+        scores=rules.get_verticality.output.table,
+        foldtrees=rules.check_trees.output.trees_common_ft,
+        structtrees=rules.check_trees.output.trees_common_structtree,
+        seqtrees=rules.check_trees.output.trees_common_seq,
+    output:
+        outdir+dataset+"/plots/"+dataset+"_{seed}_trees.png"
+    shell: '''
+Rscript scripts/compare_trees.R --seq {input.seqtrees} --struct {input.foldtrees} \
+--structml {input.structtrees} -r {input.scores} -o {output}
+'''
+
+### Old Foldtree
+
+# rule get_distances_foldseek:
+#     input: outdir+dataset+"/seeds/{seed}/{i}/{i}_fs.ids"
+#     output: outdir+dataset+"/seeds/{seed}/{i}/{i}_fs_allvall.txt"
+#     log: outdir+dataset+"/log/fs/{seed}_{i}_struct_fs.log"
+#     benchmark: outdir+dataset+"/benchmarks/fs/{seed}_{i}_struct_fs.txt"
+#     shell:'''
+# seqsdir=$(dirname {input})/seqs
+# mkdir -p $seqsdir
+
+# for id in $(cat {input}); do
+# ln -s -f -r {structure_dir}/*/cif/${{id}}-model_v4.cif.gz $seqsdir
+# done
+
+# foldseek easy-search $seqsdir $seqsdir {output} $TMPDIR/{wildcards.i} \
+# --format-output 'query,target,fident,lddt,alntmscore' --exhaustive-search -e inf > {log}
+
+# rm -r $seqsdir
+# '''
+
+
+# rule get_distmat_foldseek:
+#     input: outdir+dataset+"/seeds/{seed}/{i}/{i}_fs_allvall.txt"
+#     output:
+#         outdir+dataset+"/seeds/{seed}/{i}/{i}_fident.txt",
+#         outdir+dataset+"/seeds/{seed}/{i}/{i}_alntmscore.txt",
+#         outdir+dataset+"/seeds/{seed}/{i}/{i}_lddt.txt"
+#     shell:'''
+# python ./scripts/foldseek2distmat.py -i {input} -o {output}
+# '''
+
+# rule get_foldtree:
+#     input: outdir+dataset+"/seeds/{seed}/{i}/{i}_{mattype}.txt",
+#     output: outdir+dataset+"/seeds/{seed}/{i}/{i}_{mattype}_fs.nwk"
+#     # benchmark: outdir+dataset+"/benchmarks/quicktree/{seed}_{i}_{mattype}.txt"
+#     shell:'''
+# quicktree -i m {input} | tr -d '\n' | sed -e '$a\\' > {output}
+# '''
+
+# iqtree2 -s {input} --prefix $tree_prefix -B {UF_boot} -T AUTO --threads-max 4 --quiet --mset WAG,LG,JTTDCMut,JTT --mem 4G --cmin 4 --cmax 10
+
+# rule tree_foldseek:
+#     input: outdir+dataset+"/seeds/{seed}/{i}/{i}_fs.alg.clean"
+#     output:
+#         tree=outdir+dataset+"/seeds/{seed}/{i}/{i}_fs.treefile"
+#     threads: 4
+#     log: outdir+dataset+"/log/iqtree/{seed}_{i}_fs.log"
+#     benchmark: outdir+dataset+"/benchmarks/iqtree/{seed}_{i}_fs.txt"
+#     shell: '''
+# tree_prefix=$(echo {output.tree} | sed 's/.treefile//')
+
+# iqtree2 -s {input} --prefix $tree_prefix -B {UF_boot} -T {threads} --quiet -m GTR20 --mem 4G --cmin 4 --cmax 10
+
+# mv ${{tree_prefix}}.log {log}
+
+# rm -f ${{tree_prefix}}.iqtree ${{tree_prefix}}.splits.nex ${{tree_prefix}}.contree ${{tree_prefix}}.ckp.gz
+# '''
+
+# rule root_tree_foldseek:
+#     input: outdir+dataset+"/seeds/{seed}/{i}/{i}_fs.treefile"
+#     output: outdir+dataset+"/seeds/{seed}/{i}/{i}_fs.treefile.rooted"
+#     shell: '''
+# ./software/mad {input}
+# sed -i \'2,$d\' {output}
+# '''
+
+# check if the trimmed sequence alignment is long enough
+# def seeds_alignment_blast(wildcards):
+#     checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln_blast
+#     with open(checkpoint_output) as all_genes:
+#         seed_genes = [gn.strip() for gn in all_genes]
+#     return expand(outdir+dataset+"/seeds/{seed}/{i}/{i}_blast_aa.alg.clean", seed=wildcards.seed, i=seed_genes)
+
+# def seeds_alignment_fs(wildcards):
+#     checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln_fs
+#     with open(checkpoint_output) as all_genes:
+#         seed_genes = [gn.strip() for gn in all_genes]
+#     return expand(outdir+dataset+"/seeds/{seed}/{i}/{i}_fs_3Di.alg.clean", seed=wildcards.seed, i=seed_genes)
+
+# def seeds_alignment_common_aa(wildcards):
+#     checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln_common
+#     with open(checkpoint_output) as all_genes:
+#         seed_genes = [gn.strip() for gn in all_genes]
+#     return expand(outdir+dataset+"/seeds/{seed}/{i}/{i}_common_aa.alg.clean", seed=wildcards.seed, i=seed_genes)
+
+# def seeds_alignment_common_3Di(wildcards):
+#     checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln_common
+#     with open(checkpoint_output) as all_genes:
+#         seed_genes = [gn.strip() for gn in all_genes]
+#     return expand(outdir+dataset+"/seeds/{seed}/{i}/{i}_common_3Di.alg.clean", seed=wildcards.seed, i=seed_genes)
+
+# checkpoint check_length:
+#     input: 
+#         blast=seeds_alignment_blast,
+#         fs=seeds_alignment_fs,
+#         common_aa=seeds_alignment_common_aa,
+#         common_3Di=seeds_alignment_common_3Di,
+#     output:
+#         exclude_blast=outdir+dataset+"/ids/{seed}_blast_aln.exclude",
+#         continue_tree_blast=outdir+dataset+"/ids/{seed}_blast_phylo.ids",
+#         exclude_fs=outdir+dataset+"/ids/{seed}_fs_aln.exclude",
+#         continue_tree_fs=outdir+dataset+"/ids/{seed}_fs_phylo.ids",
+#         exclude_common_aa=outdir+dataset+"/ids/{seed}_common_aln.exclude",
+#         continue_tree_common_aa=outdir+dataset+"/ids/{seed}_common_phylo.ids",
+#         exclude_common_3Di=outdir+dataset+"/ids/{seed}_common_aln.exclude",
+#         continue_tree_common_3Di=outdir+dataset+"/ids/{seed}_common_phylo.ids"
+#     shell:'''
+# > {output.exclude_blast}
+# > {output.continue_tree_blast}
+# for file in {input.blast}; do
+#     length_trimmed=$(seqkit stats $file -T | awk 'NR>1' | cut -f6)
+#     if [ $length_trimmed -lt {min_trim_len} ]; then
+#         echo -e "$(basename $file "_blast.alg.clean")\t short clean aln" >> {output.exclude_blast}
+#     else
+#         echo $(basename $file "_blast.alg.clean") >> {output.continue_tree_blast}
+#     fi
+# done
+
+# > {output.exclude_fs}
+# > {output.continue_tree_fs}
+# for file in {input.fs}; do
+#     length_trimmed=$(seqkit stats $file -T | awk 'NR>1' | cut -f6)
+#     if [ $length_trimmed -lt {min_trim_len} ]; then
+#         echo -e "$(basename $file "_fs.alg.clean")\t short clean aln" >> {output.exclude_fs}
+#     else
+#         echo $(basename $file "_fs.alg.clean") >> {output.continue_tree_fs}
+#     fi
+# done
+
+# > {output.exclude_common_aa}
+# > {output.continue_tree_common_aa}
+# for file in {input.common_aa}; do
+#     length_trimmed=$(seqkit stats $file -T | awk 'NR>1' | cut -f6)
+#     if [ $length_trimmed -lt {min_trim_len} ]; then
+#         echo -e "$(basename $file "_common.alg.clean")\t short clean aln" >> {output.exclude_common_aa}
+#     else
+#         echo $(basename $file "_common.alg.clean") >> {output.continue_tree_common_aa}
+#     fi
+# done
+
+# > {output.exclude_common}
+# > {output.continue_tree_common}
+# for file in {input.common}; do
+#     length_trimmed=$(seqkit stats $file -T | awk 'NR>1' | cut -f6)
+#     if [ $length_trimmed -lt {min_trim_len} ]; then
+#         echo -e "$(basename $file "_common.alg.clean")\t short clean aln" >> {output.exclude_common}
+#     else
+#         echo $(basename $file "_common.alg.clean") >> {output.continue_tree_common}
+#     fi
+# done
+# '''
+
+
+# rule foldseek_mcl:
+#     input: 
+#         expand(outdir+"foldseek/out/{comb}_fs_filtered.tsv", comb=combinations_codes_str)
+#     output: 
+#         multiext(outdir+"mcl/foldseek", ".abc", ".tab", ".mci", ".I"+mcl_inflation_str)
+#     shell:'''
+#     outdir=$(echo {output} | xargs dirname  | sort -u)
+#     mkdir -p $outdir
+
+#     cat {input} | cut -f 1,2,11 > ${{outdir}}/foldseek.abc
+#     mcxload -abc ${{outdir}}/foldseek.abc --stream-mirror --stream-neg-log10 \
+#     -stream-tf 'ceil(200)' -o ${{outdir}}/foldseek.mci -write-tab ${{outdir}}/foldseek.tab
+#     mcl ${{outdir}}/foldseek.mci -I {mcl_inflation} -odir $outdir
+
+#     mcxdump -icl ${{outdir}}/out.foldseek.mci.I{mcl_inflation_str} -tabr ${{outdir}}/foldseek.tab -o ${{outdir}}/foldseek.I{mcl_inflation_str}
+# '''

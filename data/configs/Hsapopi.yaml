@@ -1,0 +1,7 @@
+# Input file
+name_dataset: 'Hsap_opistho'
+input_table_file: 'data/input_tables/Hsapopi.csv'
+species_tree: 'data/sptrees/homo.spTree.nw'
+taxons_file: 'data/meta/Hsap_taxon.csv'
+seed: ['UP000005640']
+

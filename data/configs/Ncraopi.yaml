@@ -1,0 +1,6 @@
+# Input file
+name_dataset: 'Ncra_opistho'
+input_table_file: 'data/input_tables/Ncraopi.csv'
+species_tree: 'data/sptrees/neurospora.spTree.nw'
+taxons_file: 'data/meta/Ncra_taxon.csv'
+seed: ['UP000001805']

@@ -1,0 +1,11 @@
+results/
+.snakemake/
+test/
+launch_struct.sh
+*Rproj*
+*Rhistory
+data/fastas/
+data/structures/
+data/ids/
+data/meta/*gz
+notebooks/prokaryote_sampling_cache/
