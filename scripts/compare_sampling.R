@@ -66,16 +66,16 @@ library(cowplot)
 source("scripts/functions.R")
 theme_set(theme_bw())
 
-opt <- NULL
-opt$taxidmap <- "results/Ncra_opistho/db/taxidmap"
-opt$blast <- "results/Ncra_opistho/homology/UP000001805_blast.tsv"
-opt$blast_brh <- "results/Ncra_opistho/homology/UP000001805_blast_brh.tsv"
-opt$fs <- "results/Ncra_opistho/homology/UP000001805_fs.tsv"
-opt$fs_brh <- "results/Ncra_opistho/homology/UP000001805_fs_brh.tsv"
-opt$meta <- "data/meta/Ncra_taxon.csv"
-opt$input <- "data/input_tables/Ncraopi.csv"
-opt$self_blast <- "results/Ncra_opistho/homology/allvall/UP000001805_UP000001805_blast.tsv"
-opt$self_fs <- "results/Ncra_opistho/homology/allvall/UP000001805_UP000001805_fs.tsv"
+# opt <- NULL
+# opt$taxidmap <- "results/Ncra_opistho/db/taxidmap"
+# opt$blast <- "results/Ncra_opistho/homology/UP000001805_blast.tsv"
+# opt$blast_brh <- "results/Ncra_opistho/homology/UP000001805_blast_brh.tsv"
+# opt$fs <- "results/Ncra_opistho/homology/UP000001805_fs.tsv"
+# opt$fs_brh <- "results/Ncra_opistho/homology/UP000001805_fs_brh.tsv"
+# opt$meta <- "data/meta/Ncra_taxon.csv"
+# opt$input <- "data/input_tables/Ncraopi.csv"
+# opt$self_blast <- "results/Ncra_opistho/homology/allvall/UP000001805_UP000001805_blast.tsv"
+# opt$self_fs <- "results/Ncra_opistho/homology/allvall/UP000001805_UP000001805_fs.tsv"
 
 palette_singleton <- c("#267365", "#F29F05", "#F23030")
 names(palette_singleton) <- c("common", "only_blast", "only_fs")

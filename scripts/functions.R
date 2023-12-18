@@ -6,7 +6,11 @@ fs_columns <- c("query","target","pident","length","mismatch","gapopen",
                 "qstart","qend","sstart","send","evalue","bitscore",
                 "lddt","alntmscore","rmsd","prob","qcov","tcov")
 
+palettes_method <- c("#267365", "#F29F05", "#F23030")
+names(palettes_method) <- c("common", "blast", "fs")
 
+palettes_alphabet <- c("#327AD9", "#BF3475", "#F29F05")
+names(palettes_alphabet) <- c("3Di", "aa", "fident")
 wespal <- wesanderson::wes_palette("Zissou1", 100, type = "continuous")
 
 

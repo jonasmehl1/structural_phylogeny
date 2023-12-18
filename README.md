@@ -35,8 +35,15 @@ Train a RF model on sequence and structure features with verticality as outcome 
 
 # TODOs
 
+- [ ] add rscrpit analyze_runtimes
+- [ ] add compare RF, TCS etc
+- [ ] analyze apro in the same script
+
+- [ ] What to do if the alignment sucks? add intermediate step
+
 - [ ] measure if blast singletons have different distributions compared to common hits
 - [ ] Entropy and how it correlates with lddt, also tool to mask
+- [ ] PyPythia correlates?
 
 - [ ] Download dat file and parse it with R https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota/UP000000267/UP000000267_436907.dat.gz or find some other way
 

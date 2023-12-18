@@ -81,9 +81,10 @@ def structblob2tree(input_folder, outfolder, tmpfolder, corefolder,
                 factor = 1
             matrices[k] = foldseek2tree.Tajima_dist(matrices[k], bfactor = factor)
         # np.save(outfolder + k + '_distmat.npy' , matrices[k])
-        distmat_txt = foldseek2tree.distmat_to_txt(ids, matrices[k], outfolder + '_' + k + '_distmat.txt' )
+        distmat_txt = foldseek2tree.distmat_to_txt(ids, matrices[k], outfolder + '_' + k + '.txt' )
         out_tree = foldseek2tree.runFastme(fastmepath = fastmepath, clusterfile = distmat_txt)
-        out_tree = foldseek2tree.postprocess(out_tree, outfolder + '_' + k + '.nwk', delta = delta)
+        # out_tree = foldseek2tree.postprocess(out_tree, outfolder + '_' + k + '.nwk', delta = delta)
+        out_tree = foldseek2tree.postprocess(out_tree, outfolder + '_' + k + '.treefile', delta = delta)
         trees[k] = out_tree
     return alnres, trees
 

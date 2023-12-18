@@ -12,8 +12,7 @@ parser = argparse.ArgumentParser(
 )
 
 parser.add_argument('--trees', dest='trees',required=True,
-						help=('tree files for each method'),
-						nargs='*')
+						help=('tree files for each method'))
 # parser.add_argument("-i", "--in", dest="infile", default="None", 
 #                     help="input file",required=True)
 parser.add_argument("-o", "--out", dest="out", default="None", 
@@ -45,55 +44,53 @@ if __name__ == '__main__':
     tmpfile = args.tmp
 
     df = []
+    with open(args.trees) as treefile:
+        for line in treefile:
+            line = line.strip().split()
+            gene = line[0]
+            print(gene)
+            targets = line[1]
+            alphabet = line[2]
+            tree = toytree.tree(line[3], format = 0)
+            tree = treescore.label_leaves(tree, taxidmap, uniprot_df)
+            overlap = treescore.getTaxOverlap(tree.treenode)
 
-    for inline in args.trees:
-        method = Path(inline).stem.split('_',1)[1]
-        print(method)
-        with open(inline) as tf:
-            for line in tf:
-                line = line.strip().split()
-                id = line[0]
-                tree = toytree.tree(line[1], format = 0)
-                tree = treescore.label_leaves(tree, taxidmap, uniprot_df)
-                overlap = treescore.getTaxOverlap(tree.treenode)
+            leaves = tree.get_tip_labels()
+            n_sps = len(set(leaves))
+            n_tips = len(leaves)
 
-                leaves = tree.get_tip_labels()
-                n_sps = len(set(leaves))
-                n_tips = len(leaves)
+            with open(tmpfile, 'w') as outfile:
+                outfile.write(sptree.write(tree_format=9)+'\n')
+                outfile.write(tree.write(tree_format=9)+'\n')
 
-                with open(tmpfile, 'w') as outfile:
-                    outfile.write(sptree.write(tree_format=9)+'\n')
-                    outfile.write(tree.write(tree_format=9)+'\n')
+            cmd = './software/Ranger-DTL.linux -i %s -o /dev/stdout -s -T %s -q | grep reco | cut -f2 -d\'(\' | grep -E "[0-9]+" -o' % (tmpfile, T_score)
+            result = subprocess.Popen([cmd], stdout=subprocess.PIPE, shell=True)
+            out, err = result.communicate()
+            values = out.decode("utf-8").split('\n')
+            dups = values[0]
+            losses = values[2]
 
-                print(id)
-                cmd = './software/Ranger-DTL.linux -i %s -o /dev/stdout -s -T %s -q | grep reco | cut -f2 -d\'(\' | grep -E "[0-9]+" -o' % (tmpfile, T_score)
-                result = subprocess.Popen([cmd], stdout=subprocess.PIPE, shell=True)
-                out, err = result.communicate()
-                values = out.decode("utf-8").split('\n')
-                dups = values[0]
-                losses = values[2]
+            # TCS score
+            overlap = treescore.getTaxOverlap(tree.treenode)
+            taxscore = tree.treenode.score
+            # Branch lengths, normalized by total length
+            lengths = np.array([node.dist for node in tree.treenode.traverse()])
+            total_length = np.sum(lengths)
+            lengths /= total_length
 
-                # TCS score
-                overlap = treescore.getTaxOverlap(tree.treenode)
-                taxscore = tree.treenode.score
-                # Branch lengths, normalized by total length
-                lengths = np.array([node.dist for node in tree.treenode.traverse()])
-                total_length = np.sum(lengths)
-                lengths /= total_length
+            # TCS score of root??
+            treescore.getTaxOverlap_root(tree.treenode)
+            root_score = treescore.sum_rootscore(tree.treenode)
+            # Tip to root distance
+            distances = np.array([ node.get_distance(tree.treenode) for node in tree.treenode.get_leaves() ])
+            # distances_norm = distances / np.mean(distances)
 
-                # TCS score of root??
-                treescore.getTaxOverlap_root(tree.treenode)
-                root_score = treescore.sum_rootscore(tree.treenode)
-                # Tip to root distance
-                distances = np.array([ node.get_distance(tree.treenode) for node in tree.treenode.get_leaves() ])
-                # distances_norm = distances / np.mean(distances)
+            row = [gene, targets, alphabet, dups, losses, n_sps, n_tips, 
+                    taxscore, total_length, np.mean(lengths), np.mean(distances), 
+                    np.var(distances), root_score]
+            df.append(row)
 
-                row = [id, method, dups, losses, n_sps, n_tips, 
-                       taxscore, total_length, np.mean(lengths), np.mean(distances), 
-                       np.var(distances), root_score]
-                df.append(row)
-
-    outdf = pd.DataFrame(df, columns=['id', 'method', 'dups', 'losses', 'n_sps', 'n_tips',
+    outdf = pd.DataFrame(df, columns=['id', 'targets', 'alphabet', 'dups', 'losses', 'n_sps', 'n_tips',
                                       'score', 'tree_length', 'mean_normalized_length', 'mean_r2t',
                                       'variance_r2t', 'root_score'])
 
