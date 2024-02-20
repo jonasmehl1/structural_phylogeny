@@ -10,4 +10,4 @@ data/ids/
 data/meta/*gz
 notebooks/prokaryote_sampling_cache/
 .Rproj.user
-logs/*
+logs/

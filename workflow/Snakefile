@@ -9,11 +9,12 @@ test_seeds=500
 min_len = 0
 
 # target per queries in both foldseek and blast
-target_seqs=1000
+target_seqs = 1000
 max_seqs_brh = 5
 
 # blast evalue
 eval_both = 1e-3
+coverage = 50
 eval_brh = 10
 
 
@@ -40,7 +41,8 @@ alphabets_fident = ['aa', '3Di', 'fident']
 
 
 # files and folders
-subst_matrix = "data/subst_matrixes/mat3di.out"
+subst_matrix = 'data/subst_matrixes/mat3di.out'
+subst_matrix_tree = 'data/subst_matrixes/3DI.nexus'
 sequence_dir = 'data/fastas/'
 structure_dir = 'data/structures/'
 outdir = 'results/'
@@ -60,19 +62,19 @@ combinations_codes_str=[x+"_"+y for x in codes for y in codes]
 rule all:
     input:
         outdir+dataset+'/db/db_num.tsv',
-        expand(sequence_dir+'{code}.fa', code=codes),
-        # expand(outdir+dataset+"/homology/allvall/{comb}_{method}.tsv", comb=combinations_codes_str, method=methods),
-        expand(outdir+dataset+"/homology/{seed}_{method}_brh.tsv", seed=seed_sps, method=methods),
         expand(outdir+dataset+"/plots/{seed}_homology.png", seed=seed_sps),
         expand(outdir+dataset+"/plots/{seed}_saturation.png", seed=seed_sps),
-        expand(outdir+dataset+"/trees/{seed}_{root}_trees.txt", seed=seed_sps, root=["rooted", "unrooted"]),
-        # expand(outdir+dataset+"/trees/{seed}_{mode}_ft.txt", seed=seed_sps, mode=modes),
-        # expand(outdir+dataset+"/plots/"+dataset+"_{seed}_trees.png", seed=seed_sps),
-        expand(outdir+dataset+"/reco/{seed}_scores.tsv", seed=seed_sps),
-        expand(outdir+dataset+"/reco/{seed}_{mode}_{alphabet}_apro.nwk", seed=seed_sps, mode=modes, alphabet=alphabets_fident),
         expand(outdir+dataset+"/plots/{seed}_runtime.pdf", seed=seed_sps),
         expand(outdir+dataset+"/plots/{seed}_astral_pro.pdf", seed=seed_sps),
-        expand(outdir+dataset+"/plots/{seed}_trees.pdf", seed=seed_sps),
+        expand(outdir+dataset+"/plots/{seed}_trees.pdf", seed=seed_sps)
+        # expand(sequence_dir+'{code}.fa', code=codes),
+        # expand(outdir+dataset+"/homology/allvall/{comb}_{method}.tsv", comb=combinations_codes_str, method=methods),
+        # expand(outdir+dataset+"/homology/{seed}_{method}_brh.tsv", seed=seed_sps, method=methods),
+        # expand(outdir+dataset+"/trees/{seed}_{root}_trees.txt", seed=seed_sps, root=["rooted", "unrooted"]),
+        # expand(outdir+dataset+"/trees/{seed}_{mode}_ft.txt", seed=seed_sps, mode=modes),
+        # expand(outdir+dataset+"/plots/"+dataset+"_{seed}_trees.png", seed=seed_sps),
+        # expand(outdir+dataset+"/reco/{seed}_scores.tsv", seed=seed_sps),
+        # expand(outdir+dataset+"/reco/{seed}_{mode}_{alphabet}_apro.nwk", seed=seed_sps, mode=modes, alphabet=alphabets_fident),
 
 
 rule get_nums:
@@ -117,6 +119,16 @@ cat {input.maps} > {output.mapid}
 cat {input.fa} > {output.fa}
 out_file=$(echo {output.blast} | rev | cut -f 2- -d '.' | rev)
 makeblastdb -in {output.fa} -out $out_file -parse_seqids -taxid_map {output.mapid} -dbtype prot
+'''
+
+rule make_taxidmap_ale:
+    input: 
+        taxid=rules.make_blastdb.output.mapid,
+        groups=config['taxons_file']
+    output: outdir+dataset+"/db/taxidmap_ale"
+    shell:'''
+awk 'NR>1' {input.groups} | cut -f2,11 | csvtk join -H -t -f"2;1" {input.taxid} - | \
+awk '{{split($1,a,"-"); print $1"\\t"$3"_"a[2]}}' > {output}
 '''
 
 rule make_foldseekdb:
@@ -313,7 +325,13 @@ rule get_ids:
         ids=outdir+dataset+"/seeds/{seed}/{i}/{i}_{method}.ids"
     shell:'''
 mkdir -p $(dirname {output.txt})
-awk '$1=="AF-{wildcards.i}-F1"' {input} | awk '$11<{eval_both}' > {output.txt}
+
+if [ {wildcards.method} == "blast" ]; then
+    awk '$1=="AF-{wildcards.i}-F1"' {input} | awk '$11<{eval_both} && $4/$15*100>{coverage} && $4/$16*100>{coverage}' > {output.txt}
+else
+    awk '$1=="AF-{wildcards.i}-F1"' {input} | awk '$11<{eval_both} && $17*100>{coverage} && $18*100>{coverage}' > {output.txt}
+fi
+
 seed_gene=$(cut -f1 {output.txt} | sort -u)
 echo $seed_gene > {output.ids}
 n_hits=$(wc -l < {output.txt})
@@ -400,7 +418,8 @@ rule trim_aln:
     input: outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.alg"
     output: outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.alg.clean"
     shell: '''
-trimal -in {input} -out {output} -gappyout
+trimal -in {input} -out /dev/stdout -gappyout | seqtk seq -A | \
+awk '!/^[X-]+$/' | seqtk seq -L 1 -l 60 > {output}
 '''
 # trimal -in {input} -out {output} -cons {trimal_cons} -gt {trimal_gt}
 
@@ -410,7 +429,8 @@ rule iqtree:
     input: outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.alg.clean"
     output: 
         tree=outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.treefile",
-        treeline=outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.treeline"
+        treeline=outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.treeline",
+        ufboot=outdir+dataset+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.ufboot"
     log: outdir+dataset+"/log/iqtree/{seed}_{i}_{mode}_{alphabet}.log"
     benchmark: outdir+dataset+"/benchmarks/iqtree/{seed}_{i}_{mode}_{alphabet}.txt"
     threads: 4
@@ -418,12 +438,13 @@ rule iqtree:
 tree_prefix=$(echo {output.tree} | sed 's/.treefile//')
 
 if [ {wildcards.alphabet} = "3Di" ]; then
-    model="GTR20+G4"
+    model="--mset 3DI -mdef {subst_matrix_tree}"
 else
-    model="LG+G4"
+    model="-m LG+G4"
 fi
 
-iqtree2 -s {input} --prefix $tree_prefix -B {UF_boot} -T {threads} --boot-trees --quiet -m $model --mem 4G --cmin 4 --cmax 10
+iqtree2 -s {input} --prefix $tree_prefix -B {UF_boot} -T {threads} --boot-trees --quiet \
+--mem 4G --cmin 4 --cmax 10 $model
 
 best_model=$(grep "Model of substitution:" ${{tree_prefix}}.iqtree | cut -f2 -d':' | sed 's/ //')
 loglik=$(grep "Log-likelihood of the tree:" ${{tree_prefix}}.iqtree | cut -f2 -d':' | cut -f2 -d' ')
@@ -537,6 +558,26 @@ python software/foldtree/compute_scores.py --trees {input.trees} \
 --tax {input.taxidmap} --sptree {input.sptree} --out {output.table} -l {output.lineage}
 '''
 
+# rule prepare_ALE:
+#     input: config['species_tree']
+#     output: outdir+dataset+"/ale/{seed}/sptree.nwk"
+#     shell:'''
+# Rscript scripts/add_bl.R -s {input} -o {output}    
+# '''
+
+# rule run_ALE:
+#     input:
+#         st=rules.prepare_ALE.output,
+#         gt=rules.iqtree.output.ufboot,
+#         names_map=rules.make_taxidmap_ale.output
+#     output:
+#         gt=outdir+dataset+"/ale/{seed}/{i}_{mode}_{alphabet}.nwk",
+#         rec=outdir+dataset+"/ale/{seed}/sptree.nwk_{i}_{mode}_{alphabet}.nwk.ale.uml_rec"
+#     shell:'''
+# nw_rename {input.gt} {input.names_map} > {output.gt}
+# ALEobserve {output.gt}
+# ALEml_undated {input.st} {output.gt}.ale
+# '''
 
 rule plot_trees:
     input: 
@@ -585,29 +626,48 @@ rule prepare_astral_pro:
 csvtk join -H -t -f 2 -L {input.taxidmap} {input.table} | cut -f1,10 > {output}
 '''
 
-rule astral_pro:
+rule support_astral_pro:
     input:
         sptree=config['species_tree'],
         genemap=rules.prepare_astral_pro.output,
         trees=rules.check_unrooted_trees.output.trees,
-    output: outdir+dataset+"/reco/{seed}_{mode}_{alphabet}_apro.nwk"
+    output: 
+        gt=outdir+dataset+"/reco/{seed}_{mode}_{alphabet}_apro_input.nwk",
+        st=outdir+dataset+"/reco/{seed}_{mode}_{alphabet}_apro_support.nwk"
     params: config['root']
     shell:'''
-reco_dir=$(dirname {output})
-awk '$2=="{wildcards.mode}" && $3=="{wildcards.alphabet}"' {input.trees} | cut -f4 > $reco_dir/{wildcards.mode}_{wildcards.alphabet}_apro_input.nwk
-astral-pro -c {input.sptree} -a {input.genemap} -u 2 -i $reco_dir/{wildcards.mode}_{wildcards.alphabet}_apro_input.nwk -o {output} -C --root {params}
+awk '$2=="{wildcards.mode}" && $3=="{wildcards.alphabet}"' {input.trees} | cut -f4 > {output.gt}
+astral-pro -c {input.sptree} -a {input.genemap} -u 2 -i {output.gt} -o {output.st} -C --root {params}
+'''
+
+rule run_astral_pro:
+    input:
+        gt=rules.support_astral_pro.output.gt,
+        genemap=rules.prepare_astral_pro.output,
+        trees=rules.check_unrooted_trees.output.trees
+    output: outdir+dataset+"/reco/{seed}_{mode}_{alphabet}_apro_sptree.nwk"
+    params: config['root']
+    log: outdir+dataset+"/log/apro/{seed}_{mode}_{alphabet}_apro.log"
+    threads: 4
+    shell:'''
+astral-pro -t {threads} -a {input.genemap} -u 1 -i {input.gt} -o {output} --root {params} 2> {log}
 '''
 
 rule plot_astral_pro:
     input:
         sptree=config['species_tree_labels'],
         groups=config['taxons_file'],
-        trees=expand(outdir+dataset+"/reco/{seed}_{mode}_{alphabet}_apro.nwk", seed=seed_sps, mode=modes, alphabet=alphabets_fident)
+        trees=expand(outdir+dataset+"/reco/{seed}_{mode}_{alphabet}_apro_support.nwk", seed=seed_sps, mode=modes, alphabet=alphabets_fident),
+        sptrees=expand(outdir+dataset+"/reco/{seed}_{mode}_{alphabet}_apro_sptree.nwk", seed=seed_sps, mode=modes, alphabet=alphabets_fident)
     output: outdir+dataset+"/plots/{seed}_astral_pro.pdf"
     shell:'''
 reco_dir=$(dirname {input.trees} | sort -u)
 Rscript scripts/analyze_apro.R -s {input.sptree} -m {input.groups} -a $reco_dir -o {output}
 '''
+
+#for seed in results/Hsap_opistho/seeds/UP000005640/*; do nm=$(basename $seed); num=$(comm -12 $seed/${nm}_fs.ids $seed/${nm}_blast.ids | wc -l); echo -e 
+#"$nm\t$num\t$(wc -l < $seed/${nm}_blast.ids)\t$(wc -l < $seed/${nm}_fs.ids)"; done >  trees_sampling.txt
+
 ### SMK Foldtree
 
 # rule get_distances_foldseek:

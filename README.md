@@ -28,6 +28,8 @@ See notebook: **notebooks/prokaryote_sampling.html**
 - Ranger-DTL: plot gene family binned by size (1-5,5-10...) against # of events
 - TCS score as used in foldtree (Moi et al 2023)
 
+nw_rename A1A5D9_blast_aa.ufboot new_map > test.nwk
+then you can run ALE, however ALE cannot be used with foldtree
 
 ### Random Forest classifier of which method could be better
 
@@ -35,10 +37,9 @@ Train a RF model on sequence and structure features with verticality as outcome 
 
 # TODOs
 
-- [ ] add rscrpit analyze_runtimes
-- [ ] add compare RF, TCS etc
-- [ ] analyze apro in the same script
-
+- [ ] Some sequences fail if a sequence is all gap
+- [ ] add ALE step, chech if it works and add bl to species trees
+- [ ] What to do with astral pro trees?
 - [ ] What to do if the alignment sucks? add intermediate step
 
 - [ ] measure if blast singletons have different distributions compared to common hits
@@ -52,6 +53,9 @@ Train a RF model on sequence and structure features with verticality as outcome 
 
 # Done
 
+- [x] add rscrpit analyze_runtimes
+- [x] add compare RF, TCS etc
+- [x] analyze apro in the same script
 - [x] Change 3 species
 - [x] Substitution matrix
 - [x] How to trim a structure? lddt, PAE, entropy

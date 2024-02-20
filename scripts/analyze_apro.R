@@ -24,6 +24,12 @@ desc <- "Produces informative plot on trees comparison"
 opt_parser <- OptionParser(option_list = option_list, description = desc)
 opt <- parse_args(opt_parser)
 
+#opt <- NULL
+#opt$sptree <- "data/sptrees/homo.spTree.nw"
+#opt$meta <- "data/meta/Hsap_taxon.csv"
+#opt$apro <- "results/Hsap_opistho/reco/"
+#opt$output <- ""
+
 library(tidyverse)
 library(ggtree)
 # library(ggtern)
@@ -39,7 +45,7 @@ nodes_clades <- fortify(labeled_sptree) %>%
 
 clades <- read_delim(opt$meta)
 
-apro_files <- list.files(opt$apro, pattern="*apro.nwk", full.names=TRUE)
+apro_files <- list.files(opt$apro, pattern="*apro_support.nwk", full.names=TRUE)
 apro_trees <- read.tree(text = sapply(apro_files, readLines))
 names(apro_trees) <- paste0(str_split_i(basename(apro_files), "_", 2),"_",str_split_i(basename(apro_files), "_", 3))
 
@@ -66,3 +72,14 @@ sptree_plot <- ggtree(labeled_sptree) +
 final_plot <- (sptree_plot | pp1_plot) + plot_layout(widths = c(1,1.5))
 
 ggsave(opt$output, final_plot, width = 12, height = 7)
+
+
+#apro_files_sptrees <- list.files(opt$apro, pattern="*apro_sptree.nwk", full.names=TRUE)
+#apro_sptrees <- read.tree(text = sapply(apro_files_sptrees, readLines))
+#names(apro_sptrees) <- paste0(str_split_i(basename(apro_files_sptrees), "_", 2),"_",str_split_i(basename(apro_files), "_", 3))
+
+#fortify(apro_sptrees) %>% 
+#  separate(.id, c("method", "alphabet"), remove = FALSE) %>% 
+#  ggtree() + 
+#  geom_tiplab() +
+#  facet_grid(method~alphabet)
