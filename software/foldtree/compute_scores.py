@@ -2,29 +2,29 @@ import treescore
 import toytree
 import pandas as pd
 import subprocess
-import argparse
+# import argparse
 import numpy as np
 
 from pathlib import Path
 # Parse data
-parser = argparse.ArgumentParser(
-    description="Run Ranger DTL to compute most parsimonious number of Duplication and Losses"
-)
+# parser = argparse.ArgumentParser(
+#     description="Run Ranger DTL to compute most parsimonious number of Duplication and Losses"
+# )
 
-parser.add_argument('--trees', dest='trees',required=True,
-						help=('tree files for each method'))
-# parser.add_argument("-i", "--in", dest="infile", default="None", 
-#                     help="input file",required=True)
-parser.add_argument("-o", "--out", dest="out", default="None", 
-                    help="output file", required=True)
-parser.add_argument("-t", "--tax", dest="taxidmap", default="None", 
-                    help="taxidmap file", required=True)
-parser.add_argument("-l", "--lineage", dest="lineage", default="None", 
-                    help="lineage file", required=True)
-parser.add_argument("-s", "--sptree", dest="sptree", default="None", 
-                    help="species tree",required=True)
-parser.add_argument("--tmp", dest="tmp", default="/tmp/Ranger_input.txt", 
-                    help="tmp file for Ranger")
+# parser.add_argument('--trees', dest='trees',required=True,
+# 						help=('tree files for each method'))
+# # parser.add_argument("-i", "--in", dest="infile", default="None", 
+# #                     help="input file",required=True)
+# parser.add_argument("-o", "--out", dest="out", default="None", 
+#                     help="output file", required=True)
+# parser.add_argument("-t", "--tax", dest="taxidmap", default="None", 
+#                     help="taxidmap file", required=True)
+# parser.add_argument("-l", "--lineage", dest="lineage", default="None", 
+#                     help="lineage file", required=True)
+# parser.add_argument("-s", "--sptree", dest="sptree", default="None", 
+#                     help="species tree",required=True)
+# parser.add_argument("--tmp", dest="tmp", default="/tmp/Ranger_input.txt", 
+#                     help="tmp file for Ranger")
 
 
 # def get_species_name(nodename):
@@ -35,20 +35,18 @@ parser.add_argument("--tmp", dest="tmp", default="/tmp/Ranger_input.txt",
 T_score = 2000
 
 if __name__ == '__main__':
-    args = parser.parse_args()
+    # args = parser.parse_args()
+    uniprot_df = pd.read_csv(snakemake.input[1], sep="\t", names=['query', 'mnemo','tax'])
+    taxidmap = pd.read_csv(snakemake.input[2], names=['query', 'species'], sep="\t")
 
-    uniprot_df = pd.read_csv(args.lineage, sep="\t", names=['query', 'mnemo','tax'])
-    taxidmap = pd.read_csv(args.taxidmap, names=['query', 'species'], sep="\t")
-
-    sptree = toytree.tree(args.sptree)
-    tmpfile = args.tmp
+    sptree = toytree.tree(snakemake.input[3])
+    tmpfile = snakemake.output[0]
 
     df = []
-    with open(args.trees) as treefile:
+    with open(snakemake.input[0]) as treefile:
         for line in treefile:
             line = line.strip().split()
             gene = line[0]
-            print(gene)
             targets = line[1]
             alphabet = line[2]
             tree = toytree.tree(line[3], format = 0)
@@ -94,4 +92,4 @@ if __name__ == '__main__':
                                       'score', 'tree_length', 'mean_normalized_length', 'mean_r2t',
                                       'variance_r2t', 'root_score'])
 
-    outdf.to_csv(args.out, index=False, sep="\t")
+    outdf.to_csv(snakemake.output[1], index=False, sep="\t")

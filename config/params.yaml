@@ -1,0 +1,36 @@
+# this is the number of seed genes to run the pipeline
+test_seeds: 500
+# PARAMS
+# minimum length of seed protein to keep
+min_len: 0
+
+# target per queries in both foldseek and blast
+target_seqs: 1000
+max_seqs_brh: 5
+
+# blast evalue
+eval_both: 1e-3
+coverage: 50
+eval_brh: 10
+
+
+# how many sequence max to do the tree?
+max_seqs: 150
+
+# min lddt to mask residues
+min_lddt: 50
+# Ultrafast bootstrap for iqtree
+UF_boot: 1000
+
+# trimal parameters
+# trimal_cons: 30
+# trimal_gt: 0.1
+# if trimmed aln shorter than this exclude
+# min_trim_len: 30
+
+# files and folders
+subst_matrix: 'data/subst_matrixes/mat3di.out'
+subst_matrix_tree: 'data/subst_matrixes/3DI.nexus'
+sequence_dir: 'data/fastas/'
+structure_dir: 'data/structures/'
+outdir: 'results/'

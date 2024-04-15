@@ -4,7 +4,7 @@ From a given taxon sampling and a given seed species compute a normal sequence b
 
 ## Prokaryotic genomes
 
-See notebook: **notebooks/prokaryote_sampling.html**
+See notebook: **workflow/notebooks/prokaryote_sampling.html**
 
 ## Important softwares:
 
@@ -37,23 +37,22 @@ Train a RF model on sequence and structure features with verticality as outcome 
 
 # TODOs
 
-- [ ] Some sequences fail if a sequence is all gap
-- [ ] add ALE step, chech if it works and add bl to species trees
+- [ ] size astral pro plot by # quartets
+- [ ] treestats file
+- [ ] update download data smk
 - [ ] What to do with astral pro trees?
-- [ ] What to do if the alignment sucks? add intermediate step
-
 - [ ] measure if blast singletons have different distributions compared to common hits
-- [ ] Entropy and how it correlates with lddt, also tool to mask
-- [ ] PyPythia correlates?
-
-- [ ] Download dat file and parse it with R https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota/UP000000267/UP000000267_436907.dat.gz or find some other way
-
-- [ ] do PAEs correlate?
-- [ ] Use Qmaker with busco single copy or mcl single copy to run qmake and compare resulting model with GTR
 
 # Done
 
+- [ ] do PAEs correlate?
+- [ ] PyPythia correlates?
+- [x] add ALE step, chech if it works and add bl to species trees
+- [x] Use Qmaker with busco single copy or mcl single copy to run qmake and compare resulting model with GTR: NOT NECESSARY ANYMORE
+- [x] Entropy and how it correlates with lddt, also tool to mask
+- [x] What to do if the alignment sucks? add intermediate step
 - [x] add rscrpit analyze_runtimes
+- [X] Some sequences fail if a sequence is all gap
 - [x] add compare RF, TCS etc
 - [x] analyze apro in the same script
 - [x] Change 3 species
