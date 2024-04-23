@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import os
 
-def structblob2tree(input_folder, outfolder, tmpfolder, corefolder,
+def structblob2tree(input_folder, outfolder, tmpfolder, corefolder, outtree, 
                     overwrite = False, correction = False,
                     fastmepath = 'fastme', foldseekpath = 'foldseek', delta = 0.0001,
                     kernel = 'fident', core = False, hitthresh = .8, minthresh = .6):
@@ -81,10 +81,10 @@ def structblob2tree(input_folder, outfolder, tmpfolder, corefolder,
                 factor = 1
             matrices[k] = foldseek2tree.Tajima_dist(matrices[k], bfactor = factor)
         # np.save(outfolder + k + '_distmat.npy' , matrices[k])
-        distmat_txt = foldseek2tree.distmat_to_txt(ids, matrices[k], outfolder + '_' + k + '.txt' )
+        distmat_txt = foldseek2tree.distmat_to_txt(ids, matrices[k], outtree.replace(".nwk", ".txt"))
         out_tree = foldseek2tree.runFastme(fastmepath = fastmepath, clusterfile = distmat_txt)
         # out_tree = foldseek2tree.postprocess(out_tree, outfolder + '_' + k + '.nwk', delta = delta)
-        out_tree = foldseek2tree.postprocess(out_tree, outfolder + '_' + k + '.treefile', delta = delta)
+        out_tree = foldseek2tree.postprocess(out_tree, outtree, delta = delta)
         trees[k] = out_tree
     return alnres, trees
 
@@ -93,6 +93,7 @@ if __name__ == '__main__':
     # Files
     parser.add_argument("-i", "--in", dest="struct_dir", default="None", help="input structure folder", required=True)
     parser.add_argument("-o", "--out", dest="output_dir", default="None", help="output prefix", required=True)
+    parser.add_argument("--outtree", dest="outtree", default="None", help="output tree name", required=True)
     parser.add_argument("-c", "--core", dest="core_dir", help="Tmp folder for foldseek", required=True)
     parser.add_argument("-t", "--tmp", dest="tmp_dir", default="/tmp/foldtree", help="Tmp folder for foldseek")
     parser.add_argument('--overwrite', help='overwrite existing foldseek output', action='store_true')
@@ -129,7 +130,7 @@ if __name__ == '__main__':
     # flag_dict['delta'] = args.delta
     # flag_dict['kernel'] = args.kernel
     print(f"struct dir: {args.struct_dir}, output dir: {args.output_dir}")
-    structblob2tree(args.struct_dir, args.output_dir, args.tmp_dir, args.core_dir,
+    structblob2tree(args.struct_dir, args.output_dir, args.tmp_dir, args.core_dir, args.outtree,
                     overwrite = args.overwrite, correction = args.correction,
                     delta = args.delta, kernel = args.kernel, 
                     core = args.corecut, hitthresh = args.hitthresh, minthresh = args.minthresh)

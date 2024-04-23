@@ -15,15 +15,25 @@ out_file=$(echo {output.blast} | rev | cut -f 2- -d '.' | rev)
 makeblastdb -in {output.fa} -out $out_file -parse_seqids -taxid_map {output.mapid} -dbtype prot
 '''
 
-rule make_taxidmap_ale:
-    input: 
+rule make_taxidmap_sp:
+    input:
         taxid=rules.make_blastdb.output.mapid,
         groups=config['taxons_file']
-    output: outdir+"/db/taxidmap_ale"
+    output: outdir+"/db/taxidmap_sps"
     shell:'''
 awk 'NR>1' {input.groups} | cut -f2,11 | csvtk join -H -t -f"2;1" {input.taxid} - | \
-awk '{{split($1,a,"-"); print $1"\\t"$3"_"a[2]}}' > {output}
+awk '{{print $1"\\t"$3}}' > {output}
 '''
+
+# rule make_taxidmap_ale:
+#     input: 
+#         taxid=rules.make_blastdb.output.mapid,
+#         groups=config['taxons_file']
+#     output: outdir+"/db/taxidmap_ale"
+#     shell:'''
+# awk 'NR>1' {input.groups} | cut -f2,11 | csvtk join -H -t -f"2;1" {input.taxid} - | \
+# awk '{{split($1,a,"-"); print $1"\\t"$3"_"a[2]}}' > {output}
+# '''
 
 rule make_blastdb_single:
     input:
@@ -96,4 +106,3 @@ rule aln_aa:
 seqkit grep -f {input.ids} {input.fa} > {output.seq}
 mafft --auto --thread {threads} {output.seq} > {output.aln} 2> {log}
 '''
-

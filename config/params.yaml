@@ -1,5 +1,3 @@
-# this is the number of seed genes to run the pipeline
-test_seeds: 500
 # PARAMS
 # minimum length of seed protein to keep
 min_len: 0
@@ -21,6 +19,8 @@ max_seqs: 150
 min_lddt: 50
 # Ultrafast bootstrap for iqtree
 UF_boot: 1000
+# Boostrap for quicktree
+distboot: 100
 
 # trimal parameters
 # trimal_cons: 30

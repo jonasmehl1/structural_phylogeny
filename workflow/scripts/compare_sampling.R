@@ -4,21 +4,8 @@ library(cowplot)
 source("workflow/scripts/functions.R")
 theme_set(theme_bw())
 
-# opt <- NULL
-# opt$taxidmap <- "results/Ncra_opistho/db/taxidmap"
-# opt$blast <- "results/Ncra_opistho/homology/UP000001805_blast.tsv"
-# opt$blast_brh <- "results/Ncra_opistho/homology/UP000001805_blast_brh.tsv"
-# opt$fs <- "results/Ncra_opistho/homology/UP000001805_fs.tsv"
-# opt$fs_brh <- "results/Ncra_opistho/homology/UP000001805_fs_brh.tsv"
-# opt$meta <- "data/meta/Ncra_taxon.csv"
-# opt$input <- "data/input_tables/Ncraopi.csv"
-# opt$self_blast <- "results/Ncra_opistho/homology/allvall/UP000001805_UP000001805_blast.tsv"
-# opt$self_fs <- "results/Ncra_opistho/homology/allvall/UP000001805_UP000001805_fs.tsv"
-
-palette_singleton <- c("#267365", "#F29F05", "#F23030")
-names(palette_singleton) <- c("common", "only_blast", "only_fs")
-
-taxidmap <- read_delim(snakemake@input[["taxidmap"]], col_names = c("target", "Tax_ID"), show_col_types=F)
+taxidmap <- read_delim(snakemake@input[["taxidmap"]], 
+                       col_names = c("target", "Tax_ID"), show_col_types=F)
 
 tax <- read_delim(snakemake@input[["groups"]], show_col_types=F)
 # read input table
@@ -263,7 +250,8 @@ blast_p <- blast %>%
   summarise(n=sum(value)) %>% 
   ggplot(aes(n, color=name)) + 
   stat_ecdf() +
-  ggtitle("Blast #hits based on evalue filter") + 
+  scale_color_manual(values = viridisLite::cividis(4)) +
+  labs(subtitle = "Blast #hits based on evalue filter") + 
   geom_vline(xintercept = snakemake@params[["max_seqs"]])
 
 fs_p <- fs %>% 
@@ -276,8 +264,9 @@ fs_p <- fs %>%
   summarise(n=sum(value)) %>% 
   ggplot(aes(n, color=name)) + 
   stat_ecdf() +
-  ggtitle("Foldseek #hits based on evalue filter") + 
-  geom_vline(xintercept = opt$max_seqs)
+  scale_color_manual(values = viridisLite::cividis(4)) +
+  labs(subtitle = "Foldseek #hits based on evalue filter") + 
+  geom_vline(xintercept = snakemake@params[["max_seqs"]])
 
 
 saturation_plot <- (blast_p | fs_p) + plot_layout(guides = "collect")

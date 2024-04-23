@@ -1,5 +1,8 @@
 outdir=config['outdir']+config['dataset']
-
+alphabets = ['aa', '3Di']
+models=["3Di", "QT", "LG", "GTR", "FT"]
+combinations=["3Di_3Di", "aa_QT", "aa_LG", "3Di_GTR", "3Di_FT"]
+combinations_ML=["3Di_3Di", "aa_LG", "3Di_GTR"]
 # first checkpoint and get the uniq ids in the blast or foldseek result
 checkpoint geneids_todo:
     input:
@@ -9,11 +12,11 @@ checkpoint geneids_todo:
         blast=outdir+"/ids/{seed}_blast.ids",
         fs=outdir+"/ids/{seed}_fs.ids",
         common=outdir+"/ids/{seed}_common.ids"
-    # params: config['test_seeds']
+    params: config['test_seeds']
     shell:'''
 cut -f1 {input.blast} | sort -u | sort > {output.blast}
 cut -f1 {input.fs} | sort -u | sort > {output.fs}
-comm -12 {output.blast} {output.fs} > {output.common}
+comm -12 {output.blast} {output.fs} | shuf -n {params} > {output.common}
 '''
 
 
@@ -87,29 +90,118 @@ def seeds_unrooted_trees(wildcards):
     checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln
     with open(checkpoint_output) as all_genes:
         seed_genes = [gn.strip() for gn in all_genes]
-    outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.treefile", seed=wildcards.seed, i=seed_genes, mode=modes, alphabet=alphabets_fident)
+    outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_{mode}_{comb}.nwk", 
+                      seed=wildcards.seed, i=seed_genes, mode=modes, comb=combinations)
     return outfiles
+
+def common_trees(wildcards):
+    checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln
+    with open(checkpoint_output) as all_genes:
+        seed_genes = [gn.strip() for gn in all_genes]
+    outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_common_{comb}.nwk", 
+                      seed=wildcards.seed, i=seed_genes, mode=modes, comb=combinations)
+    return outfiles
+
+def fs_trees(wildcards):
+    checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln
+    with open(checkpoint_output) as all_genes:
+        seed_genes = [gn.strip() for gn in all_genes]
+    outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_fs_{comb}.nwk", 
+                      seed=wildcards.seed, i=seed_genes, mode=modes, comb=combinations)
+    return outfiles
+
+def blast_trees(wildcards):
+    checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln
+    with open(checkpoint_output) as all_genes:
+        seed_genes = [gn.strip() for gn in all_genes]
+    outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_blast_{comb}.nwk", 
+                      seed=wildcards.seed, i=seed_genes, mode=modes, comb=combinations)
+    return outfiles
+
+
+checkpoint check_common_trees:
+    input: common_trees
+    output:
+        trees=temp(outdir+"/trees/{seed}_common_trees.tmp")
+    shell:'''
+> {output.trees}
+for file in {input}; do
+    id=$(basename $file ".nwk" | cut -f1 -d'_')
+    targets=$(basename $file ".nwk" | cut -f2 -d'_')
+    alphabet=$(basename $file ".nwk" | cut -f3 -d'_')
+    model=$(basename $file ".nwk" | cut -f4 -d'_')
+    echo -e "$id\\t$targets\\t$alphabet\\t$model\\t$(cat $file)" >> {output.trees}
+done
+'''
+
+rule common_trees:
+    input: outdir+"/trees/{seed}_common_trees.tmp"
+    output: outdir+"/trees/{seed}_common_trees.txt"
+    shell: 'mv {input} {output}'
+
+
+checkpoint check_fs_trees:
+    input: fs_trees
+    output:
+        trees=temp(outdir+"/trees/{seed}_fs_trees.tmp")
+    shell:'''
+> {output.trees}
+for file in {input}; do
+    id=$(basename $file ".nwk" | cut -f1 -d'_')
+    targets=$(basename $file ".nwk" | cut -f2 -d'_')
+    alphabet=$(basename $file ".nwk" | cut -f3 -d'_')
+    model=$(basename $file ".nwk" | cut -f4 -d'_')
+    echo -e "$id\\t$targets\\t$alphabet\\t$model\\t$(cat $file)" >> {output.trees}
+done
+'''
+
+rule fs_trees:
+    input: outdir+"/trees/{seed}_fs_trees.tmp"
+    output: outdir+"/trees/{seed}_fs_trees.txt"
+    shell: 'mv {input} {output}'
+
+
+checkpoint check_blast_trees:
+    input: blast_trees
+    output:
+        trees=temp(outdir+"/trees/{seed}_blast_trees.tmp")
+    shell:'''
+> {output.trees}
+for file in {input}; do
+    id=$(basename $file ".nwk" | cut -f1 -d'_')
+    targets=$(basename $file ".nwk" | cut -f2 -d'_')
+    alphabet=$(basename $file ".nwk" | cut -f3 -d'_')
+    model=$(basename $file ".nwk" | cut -f4 -d'_')
+    echo -e "$id\\t$targets\\t$alphabet\\t$model\\t$(cat $file)" >> {output.trees}
+done
+'''
+
+rule blast_trees:
+    input: outdir+"/trees/{seed}_blast_trees.tmp"
+    output: outdir+"/trees/{seed}_blast_trees.txt"
+    shell: 'mv {input} {output}'
+
+
+rule get_unrooted_trees:
+    input: 
+        rules.common_trees.output,
+        rules.fs_trees.output,
+        rules.blast_trees.output
+    output:
+        trees=outdir+"/trees/{seed}_unrooted_trees.txt"
+    shell:'''
+cat {input} > {output}
+'''
+
 
 def seeds_rooted_trees(wildcards):
     checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln
     with open(checkpoint_output) as all_genes:
         seed_genes = [gn.strip() for gn in all_genes]
-    outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.treefile.rooted", seed=wildcards.seed, i=seed_genes, mode=modes, alphabet=alphabets_fident)
+    outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_{mode}_{comb}.nwk.rooted", 
+                      seed=wildcards.seed, i=seed_genes, mode=modes, comb=combinations)
     return outfiles
 
-checkpoint check_unrooted_trees:
-    input: seeds_unrooted_trees
-    output:
-        trees=outdir+"/trees/{seed}_unrooted_trees.txt"
-    shell:'''
-> {output.trees}
-for file in {input}; do
-    id=$(basename $file ".treefile" | cut -f1 -d'_')
-    targets=$(basename $file ".treefile" | cut -f2 -d'_')
-    alphabet=$(basename $file ".treefile" | cut -f3 -d'_')
-    echo -e "$id\t$targets\t$alphabet\t$(cat $file)" >> {output.trees}
-done
-'''
 
 checkpoint check_rooted_trees:
     input: seeds_rooted_trees
@@ -120,10 +212,52 @@ checkpoint check_rooted_trees:
 > {output.ids}
 > {output.trees}
 for file in {input}; do
-    id=$(basename $file ".treefile.rooted" | cut -f1 -d'_')
-    targets=$(basename $file ".treefile.rooted" | cut -f2 -d'_')
-    alphabet=$(basename $file ".treefile.rooted" | cut -f3 -d'_')
+    id=$(basename $file ".nwk.rooted" | cut -f1 -d'_')
+    targets=$(basename $file ".nwk.rooted" | cut -f2 -d'_')
+    alphabet=$(basename $file ".nwk.rooted" | cut -f3 -d'_')
     echo $id >> {output.ids}
-    echo -e "$id\t$targets\t$alphabet\t$(cat $file)" >> {output.trees}
+    echo -e "$id\\t$targets\\t$alphabet\\t$(cat $file)" >> {output.trees}
 done
 '''
+
+
+def seeds_treefiles(wildcards):
+    checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln
+    with open(checkpoint_output) as all_genes:
+        seed_genes = [gn.strip() for gn in all_genes]
+    outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_{mode}_{comb}.treeline", 
+                      seed=wildcards.seed, i=seed_genes, mode=modes, comb=combinations_ML)
+    return outfiles
+
+
+checkpoint check_ML_trees:
+    input: seeds_treefiles
+    output: outdir+"/trees/{seed}_mltrees.txt"
+    shell:'''
+for file in {input}; do
+    targets=$(basename $file ".treeline" | cut -f2 -d'_')
+    echo -e "$(cat $file)\\t$targets"
+done > {output}
+'''
+
+def seeds_rangers(wildcards):
+    checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln
+    with open(checkpoint_output) as all_genes:
+        seed_genes = [gn.strip() for gn in all_genes]
+    outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_{mode}_{comb}_DTL.txt", 
+                      seed=wildcards.seed, i=seed_genes, mode=modes, 
+                      comb=combinations)
+    return outfiles
+
+rule merge_Ranger:
+    input: seeds_rangers
+    output: outdir+"/reco/{seed}_DTL.tsv"
+    shell: '''
+echo -e "gene\\treco_score\\tdups\\ttransfers\\tlosses" > {output}
+
+for file in {input}; do
+    gene=$(basename $file | cut -f1 -d'_')
+    echo -e "$gene\\g$(cat $file)"
+done >> {output}
+'''
+

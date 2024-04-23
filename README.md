@@ -35,18 +35,27 @@ then you can run ALE, however ALE cannot be used with foldtree
 
 Train a RF model on sequence and structure features with verticality as outcome to predict if a gene family could be better analyzed with seq or struc
 
+# Issues
+
+* Rooting with MAD may be useful, check for what?
+* no core cut in foldtree
+
 # TODOs
 
-- [ ] size astral pro plot by # quartets
+- [ ] trimming differences may be interesting!
 - [ ] treestats file
 - [ ] update download data smk
-- [ ] What to do with astral pro trees?
 - [ ] measure if blast singletons have different distributions compared to common hits
 
 # Done
 
 - [ ] do PAEs correlate?
 - [ ] PyPythia correlates?
+- [x] implement ranger inside snakemake rule!
+- [x] What to do with astral pro trees?
+- [x] work on compare_trees.R and add treefile (model selection and ll information)
+- [x] check runstats file
+- [x] size astral pro plot by # quartets
 - [x] add ALE step, chech if it works and add bl to species trees
 - [x] Use Qmaker with busco single copy or mcl single copy to run qmake and compare resulting model with GTR: NOT NECESSARY ANYMORE
 - [x] Entropy and how it correlates with lddt, also tool to mask
