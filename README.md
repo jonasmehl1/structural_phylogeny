@@ -44,13 +44,12 @@ Train a RF model on sequence and structure features with verticality as outcome 
 
 - [ ] trimming differences may be interesting!
 - [ ] treestats file
-- [ ] update download data smk
 - [ ] measure if blast singletons have different distributions compared to common hits
+- [ ] Model TCS or DL score with alignment and tree statistics, this you could do it in a Rmd
 
 # Done
 
-- [ ] do PAEs correlate?
-- [ ] PyPythia correlates?
+- [x] update download data smk
 - [x] implement ranger inside snakemake rule!
 - [x] What to do with astral pro trees?
 - [x] work on compare_trees.R and add treefile (model selection and ll information)

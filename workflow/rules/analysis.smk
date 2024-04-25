@@ -30,6 +30,21 @@ rule plot_evalues:
 # --sb {input.self_blast} --sf {input.self_fs} -o {output.eda} --o2 {output.saturation} -e {params.eval_both} -s {params.max_seqs}
 # '''
 
+rule plot_evalues_trees:
+    input:
+        table=config['input_table_file'],
+        groups=config['taxons_file'],
+        taxidmap=rules.make_blastdb.output.mapid,
+        blast=rules.blast.output,
+        fs=rules.foldseek.output
+        # ids=outdir+"/ids/{seed}_common.ids"
+    params: 
+        eval_both=config['eval_both'],
+        coverage=config['coverage'],
+        max_seqs=config['max_seqs']
+    output: outdir+"/plots/{seed}_singletons.pdf"
+    script: "../scripts/compare_sampling_trees.R"
+
 
 ### Comparisons
 
@@ -69,21 +84,14 @@ rule get_runstats:
     output:
         aln=outdir+"/stats/{seed}_aln.stats",
         time=outdir+"/stats/{seed}_runtime.stats"
+    threads: 12
     shell:'''
 basedir=$(dirname {input} | rev | cut -f2- -d'/' | rev | sort -u)
-seqkit stats $basedir/*/*alg* -a -b -T | cut -f1,4,6,12 > {output.aln}
-datasetdir=$(echo $basedir | rev | cut -f3- -d'/' | rev)
+seqkit stats $basedir/*/*alg* -j {threads} -a -b -T | cut -f1,4,6,12 > {output.aln}
 
-for file in $(find $datasetdir/benchmarks/ -type f -name "*txt"); do
-    bn=$(basename $file ".txt")
-    step=$(basename $(dirname $file))
-    seed=$(echo $bn | cut -f1 -d'_')
-    gene=$(echo $bn | cut -f2 -d'_')
-    method=$(echo $bn | cut -f3 -d'_')
-    alphabet=$(echo $bn | cut -f4 -d'_')
-    model=$(echo $bn | cut -f5 -d'_')
-    echo -e "$bn\\t$step\\t$seed\\t$gene\\t$method\\t$alphabet\\t$model\\t$(tail -1 $file)"
-done > {output.time}
+datasetdir=$(echo $basedir | rev | cut -f3- -d'/' | rev)
+echo -e "dirname\\tbasename\\ts\\th:m:s\\tmax_rss\\tmax_vms\\tmax_uss\\tmax_pss\\tio_in\\tio_out\\tmean_load\\tcpu_time" > {output.time}
+find $datasetdir/benchmarks/ -type f -name "*txt" -printf "%h\\t%f\\t" -exec tail -1 {{}} \; >> {output.time}
 '''
 
 rule plot_runstats:
@@ -111,25 +119,26 @@ rule support_astral_pro:
     output: 
         gt=outdir+"/reco/{seed}_{mode}_{alphabet}_{model}_apro_input.nwk",
         st=outdir+"/reco/{seed}_{mode}_{alphabet}_{model}_apro_support.nwk"
+    log: outdir+"/log/apro/{seed}_{mode}_{alphabet}_{model}_apro.log"
     params: config['root']
     shell:'''
 awk '$2=="{wildcards.mode}" && $3=="{wildcards.alphabet}" && $4=="{wildcards.model}"' {input.trees} | \
 cut -f5 > {output.gt}
-astral-pro -c {input.sptree} -a {input.genemap} -u 2 -i {output.gt} -o {output.st} -C --root {params}
+astral-pro -c {input.sptree} -a {input.genemap} -u 2 -i {output.gt} -o {output.st} -C --root {params} 2> {log}
 '''
 
-rule run_astral_pro:
-    input:
-        gt=rules.support_astral_pro.output.gt,
-        genemap=rules.prepare_astral_pro.output,
-        trees=rules.get_unrooted_trees.output.trees
-    output: outdir+"/reco/{seed}_{mode}_{alphabet}_{model}_apro_sptree.nwk"
-    params: config['root']
-    log: outdir+"/log/apro/{seed}_{mode}_{alphabet}_{model}_apro.log"
-    threads: 4
-    shell:'''
-astral-pro -t {threads} -a {input.genemap} -u 1 -i {input.gt} -o {output} --root {params} 2> {log}
-'''
+# rule run_astral_pro:
+#     input:
+#         gt=rules.support_astral_pro.output.gt,
+#         genemap=rules.prepare_astral_pro.output,
+#         trees=rules.get_unrooted_trees.output.trees
+#     output: outdir+"/reco/{seed}_{mode}_{alphabet}_{model}_apro_sptree.nwk"
+#     params: config['root']
+#     log: outdir+"/log/apro/{seed}_{mode}_{alphabet}_{model}_apro.log"
+#     threads: 4
+#     shell:'''
+# astral-pro -t {threads} -a {input.genemap} -u 1 -i {input.gt} -o {output} --root {params} 2> {log}
+# '''
 
 rule plot_astral_pro:
     input:

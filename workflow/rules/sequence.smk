@@ -22,7 +22,7 @@ rule make_taxidmap_sp:
     output: outdir+"/db/taxidmap_sps"
     shell:'''
 awk 'NR>1' {input.groups} | cut -f2,11 | csvtk join -H -t -f"2;1" {input.taxid} - | \
-awk '{{print $1"\\t"$3}}' > {output}
+awk '{{print $1"\\t"$3}}' | sort -u > {output}
 '''
 
 # rule make_taxidmap_ale:
@@ -94,7 +94,7 @@ rule blast_brh:
 
 rule aln_aa:
     input: 
-        ids=outdir+"/seeds/{seed}/{i}/{i}_{mode}.ids",
+        ids=outdir+"/seeds/{seed}/{i}/{i}_{mode}.top",
         fa=rules.make_blastdb.output.fa
     output:
         seq=outdir+"/seeds/{seed}/{i}/{i}_{mode}_aa.seqs",

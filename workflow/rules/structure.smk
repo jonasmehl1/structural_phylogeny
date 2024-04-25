@@ -100,7 +100,7 @@ rule foldseek_brh:
 # If foldseek, retrieve sequences from "translated version"
 rule aln_3Di:
     input:
-        ids=outdir+"/seeds/{seed}/{i}/{i}_{mode}.ids",
+        ids=outdir+"/seeds/{seed}/{i}/{i}_{mode}.top",
         fa=rules.make_foldseekdb_seq.output
     output:
         seq=outdir+"/seeds/{seed}/{i}/{i}_{mode}_3Di.seqs",

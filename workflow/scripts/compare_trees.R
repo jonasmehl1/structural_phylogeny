@@ -16,12 +16,11 @@ df_trees <- read_delim(snakemake@input[["trees"]], show_col_types = FALSE,
 
 # ML trees with selected model and LL
 df_ml <- read_delim(snakemake@input[["mltrees"]], delim = "\t", 
-                    show_col_types=FALSE,
-                    col_names = c("gene", "rate", "ll", "tree", "targets")) %>% 
+                    show_col_types=FALSE) %>% 
   # mutate(fn=gsub("_mltrees.txt", "", basename(fn))) %>% 
   # separate(fn, c("gene", "target", "alphabet", "model"), sep = "_") %>% 
-  mutate(model=gsub("GTR20", "GTR", gsub("\\+.*", "", rate)), 
-         rate=sub("\\+", "", gsub("GTR20|3DI|LG", "", rate)))
+  mutate(model=factor(gsub("3DI", "3Di", gsub("GTR20", "GTR", gsub("\\+.*", "", Model))), levels=models), 
+         rate=sub("\\+", "", gsub("GTR20|3DI|LG", "", Model)))
 
 # Read all trees
 ts <- read.tree(text = df_trees$tree)
@@ -46,13 +45,13 @@ plot_bs <- ggplot(df_bs, aes(model, support, fill=target)) +
 
 # First of all let's check if they have the same heterogeneity model
 plot_rate <- df_ml %>%
-  select(-tree) %>%
+  # select(-tree) %>%
   mutate(Freq=grepl("F", rate), Inv=grepl("I", rate),
          Gamma=grepl("G", rate), FreeRate=grepl("R", rate)) %>%
-  select(-rate, -ll) %>%
+  select(gene, targets, model, Freq, Inv, Gamma, FreeRate) %>%
   pivot_longer(cols = c(Freq,Inv,Gamma,FreeRate)) %>%
-  inner_join(.,., by=c("gene", "targets", "name")) %>%
-  filter(model.x>model.y) %>%
+  inner_join(.,., by=c("gene", "targets", "name"), relationship = "many-to-many") %>%
+  filter(as.numeric(model.x) > as.numeric(model.y)) %>%
   mutate(comp=paste0(model.x, " vs ", model.y)) %>%
   group_by(name, model.x, model.y) %>%
   count(value.x, value.y) %>%
@@ -67,15 +66,15 @@ plot_rate <- df_ml %>%
 
 
 plot_3di <- filter(df_ml, model!="LG") %>% 
-  pivot_wider(id_cols = c(gene, targets), values_from = c(rate,ll), names_from = model) %>% 
+  pivot_wider(id_cols = c(gene, targets), values_from = c(rate,BIC), names_from = model) %>% 
   # print() %>% 
-  mutate(diff_ll=ll_3DI-ll_GTR, better_3Di=diff_ll>0) %>% 
-  ggplot(aes(diff_ll)) +
+  mutate(diff_BIC=BIC_3Di-BIC_GTR, better_3Di=diff_BIC<0) %>% 
+  ggplot(aes(diff_BIC)) +
   # geom_density() + 
   ggdist::stat_slab(aes(fill = after_stat(level)), .width = c(.5, .66, .95, 1)) +
   scale_fill_brewer() +
   geom_text(data = . %>%
-              mutate(x=quantile(diff_ll, .95)) %>% 
+              mutate(x=quantile(diff_BIC, .1)) %>% 
               group_by(targets, better_3Di, x) %>% 
               summarise(n=n()) %>% 
               pivot_wider(names_from = better_3Di, values_from = n) %>% 
@@ -85,7 +84,7 @@ plot_3di <- filter(df_ml, model!="LG") %>%
   geom_vline(xintercept = 0) + 
   coord_cartesian(expand = 0) + 
   facet_wrap(~targets, nrow = 1) +
-  labs(x="LL 3Di - LL GTR", y="Density", subtitle = "GTR vs 3Di LogLik") + 
+  labs(x="BIC 3Di - BIC GTR", y="Density", subtitle = "GTR vs 3Di BIC") + 
   theme(legend.position = "bottom")
 
 # Compare trees with RF distance
@@ -132,13 +131,11 @@ rf_plot <- rf_df %>%
 
 
 # Reconciliation ranger+TCS scores
+reco <- read_delim(snakemake@input[["reco"]], show_col_types = FALSE) 
+
 scores <- read_delim(snakemake@input[["scores"]], show_col_types = FALSE) %>% 
+  left_join(reco) %>% 
   mutate(model=factor(model, levels=models))
-
-reco <- read_delim(snakemake@input[["reco"]], show_col_types = FALSE)
-
-scores <- scores %>% left_join(reco, by=c("id"="gene"))
-print(scores)
 
 # Ranger results
 ranger_plot <- mutate(scores, n_events = (dups+losses)/n_tips) %>% 

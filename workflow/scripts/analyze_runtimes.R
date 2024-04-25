@@ -1,15 +1,15 @@
 suppressPackageStartupMessages(library(tidyverse))
 library(patchwork)
 source("workflow/scripts/functions.R")
-
 theme_set(theme_bw())
 
-cnames <- c("bn","step","seed","gene","method","alphabet", "model",
-            "s","h:m:s","max_rss","max_vms","max_uss","max_pss",
-            "io_in","io_out","mean_load","cpu_time")
+df <- read_delim(snakemake@input[["time"]], 
+                 show_col_types = FALSE) %>% 
+  mutate(basename=gsub(".txt", "", basename),
+         step=basename(dirname),
+         max_rss_gb = measurements::conv_unit(max_rss, from = "MB", to = "GB")) %>% 
+  separate(basename, c("seed", "gene", "method", "alphabet", "model"))
 
-df <- read_delim(snakemake@input[["time"]], col_names = cnames, show_col_types = FALSE) %>% 
-  mutate(max_rss_gb = measurements::conv_unit(max_rss, from = "MB", to = "GB"))
 
 aln_stats <- read_delim(snakemake@input[["aln"]], show_col_types = FALSE) %>%
   mutate(trim = ifelse(grepl("clean", file), "clean", "aln"),

@@ -25,7 +25,10 @@ rule get_ids:
     input: outdir+"/homology/{seed}_{method}.tsv"
     output: 
         txt=outdir+"/seeds/{seed}/{i}/{i}.{method}",
-        ids=outdir+"/seeds/{seed}/{i}/{i}_{method}.ids"
+        ids=outdir+"/seeds/{seed}/{i}/{i}_{method}.ids",
+        top_ids=outdir+"/seeds/{seed}/{i}/{i}_{method}.top"
+    wildcard_constraints: 
+        method='blast|fs'
     params: 
         eval_both=config['eval_both'],
         coverage=config['coverage'],
@@ -41,29 +44,37 @@ fi
 
 seed_gene=$(cut -f1 {output.txt} | sort -u)
 echo $seed_gene > {output.ids}
+
 n_hits=$(wc -l < {output.txt})
 if [ $n_hits -gt 1 ]; then
-    sort -gr -k12 {output.txt} | cut -f2 | grep -v -w $seed_gene | sort -u | awk 'NR < {params.max_seqs}' >> {output.ids}
+    cut -f2 {output.txt} | grep -v -w $seed_gene >> {output.ids}
 fi
-sort {output.ids} -o {output.ids}
+
+awk 'NR <= {params.max_seqs}' {output.ids} > {output.top_ids}
 '''
+# sort {output.ids} -o {output.ids}
+# sort {output.top_ids} -o {output.top_ids}
+# foldseek results are sorted by bitScore * sqrt(alnlddt * alntmscore) https://github.com/steineggerlab/foldseek/issues/85
 
 rule get_common_ids:
     input: 
-        blast=outdir+"/seeds/{seed}/{i}/{i}_blast.ids",
+        blast=outdir+"/seeds/{seed}/{i}/{i}.blast",
         fs=outdir+"/seeds/{seed}/{i}/{i}_fs.ids"
     output: 
-        outdir+"/seeds/{seed}/{i}/{i}_common.ids"
+        outdir+"/seeds/{seed}/{i}/{i}_common.top"
+    params: 
+        max_seqs=config['max_seqs']
     shell:'''
-comm -12 {input.blast} {input.fs} > {output}
+grep -f {input.fs} {input.blast} | cut -f2 | awk 'NR <= {params.max_seqs}' > {output}
 '''
+# in this case you can sort the common by blast order
 
 def seeds_homology(wildcards):
     checkpoint_output = checkpoints.geneids_todo.get(**wildcards).output.common
     with open(checkpoint_output) as all_genes:
         seed_genes = [gn.strip() for gn in all_genes]
         parsed_seed_genes = [gn.split('-')[1] for gn in seed_genes]
-    return expand(outdir+"/seeds/{seed}/{i}/{i}_common.ids", seed=wildcards.seed, i=parsed_seed_genes, mode=modes)
+    return expand(outdir+"/seeds/{seed}/{i}/{i}_common.top", seed=wildcards.seed, i=parsed_seed_genes, mode=modes)
 
 checkpoint check_orphans:
     input: seeds_homology
@@ -77,7 +88,7 @@ checkpoint check_orphans:
 for file in {input}; do
     n_hits=$(wc -l < $file)
     if [ $n_hits -lt 4 ]; then
-        echo -e "$(basename $file | cut -f1 -d'_')\tless than 4 common hits" >> {output.exclude}
+        echo -e "$(basename $file | cut -f1 -d'_')\\tless than 4 common hits" >> {output.exclude}
     else
         echo "$(basename $file | cut -f1 -d'_')" >> {output.continue_aln}
     fi
@@ -126,11 +137,7 @@ checkpoint check_common_trees:
     shell:'''
 > {output.trees}
 for file in {input}; do
-    id=$(basename $file ".nwk" | cut -f1 -d'_')
-    targets=$(basename $file ".nwk" | cut -f2 -d'_')
-    alphabet=$(basename $file ".nwk" | cut -f3 -d'_')
-    model=$(basename $file ".nwk" | cut -f4 -d'_')
-    echo -e "$id\\t$targets\\t$alphabet\\t$model\\t$(cat $file)" >> {output.trees}
+    echo -e "$(basename $file ".nwk" | tr '_' '\\t')\\t$(cat $file)" >> {output.trees}
 done
 '''
 
@@ -147,11 +154,7 @@ checkpoint check_fs_trees:
     shell:'''
 > {output.trees}
 for file in {input}; do
-    id=$(basename $file ".nwk" | cut -f1 -d'_')
-    targets=$(basename $file ".nwk" | cut -f2 -d'_')
-    alphabet=$(basename $file ".nwk" | cut -f3 -d'_')
-    model=$(basename $file ".nwk" | cut -f4 -d'_')
-    echo -e "$id\\t$targets\\t$alphabet\\t$model\\t$(cat $file)" >> {output.trees}
+    echo -e "$(basename $file ".nwk" | tr '_' '\\t')\\t$(cat $file)" >> {output.trees}
 done
 '''
 
@@ -168,11 +171,7 @@ checkpoint check_blast_trees:
     shell:'''
 > {output.trees}
 for file in {input}; do
-    id=$(basename $file ".nwk" | cut -f1 -d'_')
-    targets=$(basename $file ".nwk" | cut -f2 -d'_')
-    alphabet=$(basename $file ".nwk" | cut -f3 -d'_')
-    model=$(basename $file ".nwk" | cut -f4 -d'_')
-    echo -e "$id\\t$targets\\t$alphabet\\t$model\\t$(cat $file)" >> {output.trees}
+    echo -e "$(basename $file ".nwk" | tr '_' '\\t')\\t$(cat $file)" >> {output.trees}
 done
 '''
 
@@ -212,11 +211,7 @@ checkpoint check_rooted_trees:
 > {output.ids}
 > {output.trees}
 for file in {input}; do
-    id=$(basename $file ".nwk.rooted" | cut -f1 -d'_')
-    targets=$(basename $file ".nwk.rooted" | cut -f2 -d'_')
-    alphabet=$(basename $file ".nwk.rooted" | cut -f3 -d'_')
-    echo $id >> {output.ids}
-    echo -e "$id\\t$targets\\t$alphabet\\t$(cat $file)" >> {output.trees}
+    echo -e "$(basename $file ".nwk.rooted" | tr '_' '\\t')\\t$(cat $file)" >> {output.trees}
 done
 '''
 
@@ -225,7 +220,7 @@ def seeds_treefiles(wildcards):
     checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln
     with open(checkpoint_output) as all_genes:
         seed_genes = [gn.strip() for gn in all_genes]
-    outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_{mode}_{comb}.treeline", 
+    outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_{mode}_{comb}.iqtree", 
                       seed=wildcards.seed, i=seed_genes, mode=modes, comb=combinations_ML)
     return outfiles
 
@@ -234,10 +229,14 @@ checkpoint check_ML_trees:
     input: seeds_treefiles
     output: outdir+"/trees/{seed}_mltrees.txt"
     shell:'''
+echo -e "gene\\ttargets\\tModel\\tLogL\\tAIC\\tw-AIC\\tAICc\\tw-AICc\\tBIC\\tw-BIC" > {output}
+
 for file in {input}; do
-    targets=$(basename $file ".treeline" | cut -f2 -d'_')
-    echo -e "$(cat $file)\\t$targets"
-done > {output}
+    gene=$(basename $file ".iqtree" | cut -f1 -d'_')
+    targets=$(basename $file ".iqtree" | cut -f2 -d'_')
+    model_line=$(grep -E '^(LG|GTR20|3DI)' $file | awk 'NR==1' | awk -v OFS="\\t" '$1=$1' | sed 's/\\t[+-]\\t/\\t/g')
+    echo -e "$gene\\t$targets\\t$(echo $model_line | tr ' ' '\\t')"
+done >> {output}
 '''
 
 def seeds_rangers(wildcards):
@@ -253,11 +252,10 @@ rule merge_Ranger:
     input: seeds_rangers
     output: outdir+"/reco/{seed}_DTL.tsv"
     shell: '''
-echo -e "gene\\treco_score\\tdups\\ttransfers\\tlosses" > {output}
+echo -e "id\\ttargets\\talphabet\\tmodel\\treco_score\\tdups\\ttransfers\\tlosses" > {output}
 
 for file in {input}; do
-    gene=$(basename $file | cut -f1 -d'_')
-    echo -e "$gene\\g$(cat $file)"
+    echo -e "$(basename $file "_DTL.txt" | tr '_' '\\t')\\t$(cat $file)"
 done >> {output}
 '''
 

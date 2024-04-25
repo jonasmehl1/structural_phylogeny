@@ -47,7 +47,7 @@ if __name__ == '__main__':
             distances = np.array([ node.get_distance(tree.treenode) for node in tree.treenode.get_leaves() ])
             # distances_norm = distances / np.mean(distances)
 
-            row = [gene, targets, alphabet, model, dups, losses, n_sps, n_tips, 
+            row = [gene, targets, alphabet, model, n_sps, n_tips, 
                     taxscore, total_length, np.mean(lengths), np.mean(distances), 
                     np.var(distances), root_score]
             df.append(row)

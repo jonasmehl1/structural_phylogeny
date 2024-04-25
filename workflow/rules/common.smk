@@ -9,102 +9,44 @@ awk '!/^[X-]+$/' | seqtk seq -L 1 -l 60 > {output}
 '''
 # trimal -in {input} -out {output} -cons {trimal_cons} -gt {trimal_gt}
 
-rule iqtree_3Di:
+rule iqtree:
     input: outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.alg.clean"
     output: 
-        tree=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_3Di.nwk",
-        treeline=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_3Di.treeline",
-        ufboot=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_3Di.ufboot"
+        tree=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}.nwk",
+        # treeline=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}.treeline",
+        ufboot=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}.ufboot",
+        iqtree=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}.iqtree"
     wildcard_constraints:
-        alphabet="3Di"
+        model="GTR|LG|3Di"
     params: 
         submat=config['subst_matrix_tree'],
         ufboot=config['UF_boot']
-    log: outdir+"/log/iqtree/{seed}_{i}_{mode}_{alphabet}_3Di.log"
-    benchmark: outdir+"/benchmarks/iqtree/{seed}_{i}_{mode}_{alphabet}_3Di.txt"
+    log: outdir+"/log/iqtree/{seed}_{i}_{mode}_{alphabet}_{model}.log"
+    benchmark: outdir+"/benchmarks/iqtree/{seed}_{i}_{mode}_{alphabet}_{model}.txt"
     threads: 4
     shell: '''
 tree_prefix=$(echo {output.tree} | sed 's/.nwk//')
+model={wildcards.model}
+
+if [ "$model" == "GTR" ]; then
+    model="GTR20"
+elif [ "$model" == "3Di" ]; then
+    model="3DI -mdef {params.submat}"
+fi
 
 iqtree2 -s {input} --prefix $tree_prefix -B {params.ufboot} -T {threads} --boot-trees --quiet \
---mem 4G --cmin 4 --cmax 10 --mset 3DI -mdef {params.submat}
-
-best_model=$(grep "Model of substitution:" ${{tree_prefix}}.iqtree | cut -f2 -d':' | sed 's/ //')
-loglik=$(grep "Log-likelihood of the tree:" ${{tree_prefix}}.iqtree | cut -f2 -d':' | cut -f2 -d' ')
+--mem 4G --cmin 4 --cmax 10 --mset $model
 
 mv ${{tree_prefix}}.treefile {output.tree}
-
-echo -e "{wildcards.i}\\t$best_model\\t$loglik\\t$(cat {output.tree})" > {output.treeline}
-
 mv ${{tree_prefix}}.log {log}
-rm -f ${{tree_prefix}}.iqtree ${{tree_prefix}}.model.gz ${{tree_prefix}}.splits.nex ${{tree_prefix}}.contree ${{tree_prefix}}.ckp.gz
+rm -f ${{tree_prefix}}.model.gz ${{tree_prefix}}.splits.nex ${{tree_prefix}}.contree ${{tree_prefix}}.ckp.gz
 '''
 
-rule iqtree_GTR:
-    input: outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.alg.clean"
-    output: 
-        tree=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_GTR.nwk",
-        treeline=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_GTR.treeline",
-        ufboot=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_GTR.ufboot"
-    wildcard_constraints:
-        alphabet="3Di"
-    params:
-        ufboot=config['UF_boot']
-    log: outdir+"/log/iqtree/{seed}_{i}_{mode}_{alphabet}_GTR.log"
-    benchmark: outdir+"/benchmarks/iqtree/{seed}_{i}_{mode}_{alphabet}_GTR.txt"
-    threads: 4
-    shell: '''
-tree_prefix=$(echo {output.tree} | sed 's/.nwk//')
-
-iqtree2 -s {input} --prefix $tree_prefix -B {params.ufboot} -T {threads} --boot-trees --quiet \
---mem 4G --cmin 4 --cmax 10 --mset GTR20
-
-best_model=$(grep "Model of substitution:" ${{tree_prefix}}.iqtree | cut -f2 -d':' | sed 's/ //')
-loglik=$(grep "Log-likelihood of the tree:" ${{tree_prefix}}.iqtree | cut -f2 -d':' | cut -f2 -d' ')
-
-mv ${{tree_prefix}}.treefile {output.tree}
-
-echo -e "{wildcards.i}\\t$best_model\\t$loglik\\t$(cat {output.tree})" > {output.treeline}
-
-mv ${{tree_prefix}}.log {log}
-rm -f ${{tree_prefix}}.iqtree ${{tree_prefix}}.model.gz ${{tree_prefix}}.splits.nex ${{tree_prefix}}.contree ${{tree_prefix}}.ckp.gz
-'''
-
-
-rule iqtree_LG:
-    input: outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.alg.clean"
-    output: 
-        tree=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_LG.nwk",
-        treeline=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_LG.treeline",
-        ufboot=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_LG.ufboot"
-    wildcard_constraints:
-        alphabet="aa"
-    params: 
-        ufboot=config['UF_boot']
-    log: outdir+"/log/iqtree/{seed}_{i}_{mode}_{alphabet}_LG.log"
-    benchmark: outdir+"/benchmarks/iqtree/{seed}_{i}_{mode}_{alphabet}_LG.txt"
-    threads: 4
-    shell: '''
-tree_prefix=$(echo {output.tree} | sed 's/.nwk//')
-
-iqtree2 -s {input} --prefix $tree_prefix -B {params.ufboot} -T {threads} --boot-trees --quiet \
---mem 4G --cmin 4 --cmax 10 --mset LG
-
-best_model=$(grep "Model of substitution:" ${{tree_prefix}}.iqtree | cut -f2 -d':' | sed 's/ //')
-loglik=$(grep "Log-likelihood of the tree:" ${{tree_prefix}}.iqtree | cut -f2 -d':' | cut -f2 -d' ')
-
-mv ${{tree_prefix}}.treefile {output.tree}
-
-echo -e "{wildcards.i}\\t$best_model\\t$loglik\\t$(cat {output.tree})" > {output.treeline}
-
-mv ${{tree_prefix}}.log {log}
-rm -f ${{tree_prefix}}.iqtree ${{tree_prefix}}.model.gz ${{tree_prefix}}.splits.nex ${{tree_prefix}}.contree ${{tree_prefix}}.ckp.gz
-'''
 
 ##### FOLDTREE #####
 
 rule foldseek_allvall_tree:
-    input: outdir+"/seeds/{seed}/{i}/{i}_{mode}.ids"
+    input: outdir+"/seeds/{seed}/{i}/{i}_{mode}.top"
     output: outdir+"/seeds/{seed}/{i}/{i}_{mode}_allvall.txt"
     params: config['structure_dir']
     log: outdir+"/log/foldseek/{seed}_{i}_{mode}.log"

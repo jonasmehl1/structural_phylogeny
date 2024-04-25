@@ -31,10 +31,9 @@ outdir=config['outdir']+config['dataset']
 # possible combinations:
 combinations_codes_str=[x+"_"+y for x in codes for y in codes]
 
-plots = ["homology", "saturation", "runtime", "astral_pro", "trees", "discordance"]
+plots = ["homology", "saturation", "runtime", "astral_pro", "trees", "discordance", "singletons"]
 
 rule all:
     input:
         outdir+'/db/db_num.tsv',
-        expand(outdir+"/reco/{seed}_DTL.tsv", seed=config['seed']),
         expand(outdir+"/plots/{seed}_{plot}.pdf", seed=config['seed'], plot=plots)
