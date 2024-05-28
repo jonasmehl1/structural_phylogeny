@@ -1,4 +1,4 @@
-outdir=config['outdir']+config['dataset']
+# outdir=config['outdir']+config['dataset']
 
 input_table = pd.read_csv(config['input_table_file'], header=None, sep='\t')
 input_table.columns = ['uniprot', 'taxid', 'count1', 'count2', 'count3', 'genome', 'source', 'species', 'mnemo']
@@ -100,7 +100,7 @@ rule foldseek_brh:
 # If foldseek, retrieve sequences from "translated version"
 rule aln_3Di:
     input:
-        ids=outdir+"/seeds/{seed}/{i}/{i}_{mode}.top",
+        ids=outdir+"/seeds/{seed}/{i}/{i}_{mode}.ids",
         fa=rules.make_foldseekdb_seq.output
     output:
         seq=outdir+"/seeds/{seed}/{i}/{i}_{mode}_3Di.seqs",

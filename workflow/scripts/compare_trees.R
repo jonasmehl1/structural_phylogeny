@@ -6,9 +6,6 @@ source("workflow/scripts/functions.R")
 
 theme_set(theme_classic())
 
-# order of models
-models <- c("QT", "FT", "LG", "GTR", "3Di")
-
 # all trees
 df_trees <- read_delim(snakemake@input[["trees"]], show_col_types = FALSE,
                        col_names = c("gene", "target", "alphabet", "model", "tree")) %>% 
@@ -73,17 +70,17 @@ plot_3di <- filter(df_ml, model!="LG") %>%
   # geom_density() + 
   ggdist::stat_slab(aes(fill = after_stat(level)), .width = c(.5, .66, .95, 1)) +
   scale_fill_brewer() +
-  geom_text(data = . %>%
-              mutate(x=quantile(diff_BIC, .1)) %>% 
-              group_by(targets, better_3Di, x) %>% 
-              summarise(n=n()) %>% 
-              pivot_wider(names_from = better_3Di, values_from = n) %>% 
-              mutate(prop_better=`TRUE`/(`TRUE`+`FALSE`)), 
-            mapping = aes(x=x, y=0.5, 
-                          label=paste0(round(prop_better*100, 2),"%"))) +
+  # geom_text(data = . %>%
+  #             mutate(x=quantile(diff_BIC, .1)) %>% 
+  #             group_by(targets, better_3Di, x) %>% 
+  #             summarise(n=n()) %>% 
+  #             pivot_wider(names_from = better_3Di, values_from = n) %>% 
+  #             mutate(prop_better=`TRUE`/(`TRUE`+`FALSE`)), 
+  #           mapping = aes(x=x, y=0.5, 
+  #                         label=paste0(round(prop_better*100, 2),"%"))) +
   geom_vline(xintercept = 0) + 
   coord_cartesian(expand = 0) + 
-  facet_wrap(~targets, nrow = 1) +
+  facet_grid(~targets, scales="free_x") +
   labs(x="BIC 3Di - BIC GTR", y="Density", subtitle = "GTR vs 3Di BIC") + 
   theme(legend.position = "bottom")
 
@@ -167,7 +164,7 @@ plot_tcs <- inner_join(TCS_df, TCS_df, by = c("id", "targets"),
 
 
 plot_varr2t <- scores %>% 
-  filter(model %in% c("3Di", "LG", "GTR")) %>% 
+  # filter(model %in% c("3Di", "LG", "GTR")) %>% 
   ggplot(aes(variance_r2t, color=model)) +
   geom_density() + 
   facet_wrap(.~targets, nrow = 1) +

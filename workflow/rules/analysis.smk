@@ -1,10 +1,7 @@
-outdir=config['outdir']+config['dataset']
+# outdir=config['outdir']+config['dataset']
 # type of diff matrixed for foldtree
-# mattypes = ['fident', 'alntmscore', 'lddt']
-modes = ['blast', 'fs', 'common']
-methods = ['blast', 'fs']
-alphabets = ['aa', '3Di']
-alphabets_fident = ['aa', '3Di', 'fident']
+modes = ['blast', 'fs', 'common', 'union']
+combinations=["3Di_3Di", "aa_QT", "aa_LG", "3Di_GTR", "3Di_FT", "3Di_FTPY"]
 
 rule plot_evalues:
     input:
@@ -12,10 +9,10 @@ rule plot_evalues:
         groups=config['taxons_file'],
         taxidmap=rules.make_blastdb.output.mapid,
         blast=rules.blast.output,
-        blast_brh=rules.blast_brh.output,
+        # blast_brh=rules.blast_brh.output,
         self_blast=outdir+"/homology/allvall/{seed}_{seed}_blast.tsv",
         fs=rules.foldseek.output,
-        fs_brh=rules.foldseek_brh.output,
+        # fs_brh=rules.foldseek_brh.output,
         self_fs=outdir+"/homology/allvall/{seed}_{seed}_fs.tsv"
     params: 
         eval_both=config['eval_both'],
@@ -46,6 +43,53 @@ rule plot_evalues_trees:
     script: "../scripts/compare_sampling_trees.R"
 
 
+rule plot_blens:
+    input:
+        blast=rules.blast.output,
+        fs=rules.foldseek.output,
+        trees=rules.get_unrooted_trees.output.trees
+    params: 
+        eval_both=config['eval_both'],
+        coverage=config['coverage'],
+        max_seqs=config['max_seqs']
+    output: outdir+"/plots/{seed}_distance.pdf"
+    script: "../scripts/analyze_bl.R"
+
+
+checkpoint get_examples_ids:
+    input: outdir+"/ids/{seed}_aln.ids"
+    output: outdir+"/ids/{seed}_examples.ids"
+    params: config["n_examples"]
+    shell: '''
+shuf -n {params} {input} > {output}    
+'''
+
+def seeds_examples(wildcards):
+    checkpoint_output = checkpoints.get_examples_ids.get(**wildcards).output[0]
+    with open(checkpoint_output) as all_genes:
+        seed_genes = [gn.strip() for gn in all_genes]
+    outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_union_3Di.html", 
+                      seed=wildcards.seed, i=seed_genes)
+    return outfiles
+
+rule get_examples_report:
+    input: seeds_examples
+    output: directory(outdir+"/plots/{seed}_foldmason")
+    shell: 'mkdir {output}; cp {input} {output}'
+
+rule plot_examples:
+    input: 
+        trees=rules.get_unrooted_trees.output.trees,
+        ids=rules.get_examples_ids.output,
+        taxidmap=rules.make_blastdb.output.mapid,
+        reco=rules.merge_Ranger.output.DTLs,
+        sptree=config['species_tree_labels'],
+        meta=config['taxons_file'],
+        gff=config['gff_dir']+'{seed}.gff'
+    params: seed=config["seed"]
+    output: outdir+"/plots/{seed}_examples.pdf"
+    script: "../scripts/plot_example.R"
+
 ### Comparisons
 
 rule get_lineage:
@@ -70,7 +114,7 @@ rule get_verticality:
 rule plot_trees:
     input: 
         scores=rules.get_verticality.output,
-        reco=rules.merge_Ranger.output,
+        reco=rules.merge_Ranger.output.DTLs,
         trees=outdir+"/trees/{seed}_unrooted_trees.txt",
         mltrees=outdir+"/trees/{seed}_mltrees.txt"
     output:
@@ -113,7 +157,7 @@ csvtk join -H -t -f 2 -L {input.taxidmap} {input.table} | cut -f1,10 > {output}
 
 rule support_astral_pro:
     input:
-        sptree=config['species_tree'],
+        sptree=config['species_tree_labels'],
         genemap=rules.prepare_astral_pro.output,
         trees=rules.get_unrooted_trees.output.trees,
     output: 

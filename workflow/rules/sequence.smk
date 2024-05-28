@@ -1,4 +1,4 @@
-outdir=config['outdir']+config['dataset']
+# outdir=config['outdir']+config['dataset']
 
 rule make_blastdb:
     input:
@@ -22,8 +22,9 @@ rule make_taxidmap_sp:
     output: outdir+"/db/taxidmap_sps"
     shell:'''
 awk 'NR>1' {input.groups} | cut -f2,11 | csvtk join -H -t -f"2;1" {input.taxid} - | \
-awk '{{print $1"\\t"$3}}' | sort -u > {output}
+awk '{{print $1"\\t"$3}}' | shuf > {output}
 '''
+# I shuf because in very few instances nw_rename fails!!! Magic stuff
 
 # rule make_taxidmap_ale:
 #     input: 
@@ -94,7 +95,7 @@ rule blast_brh:
 
 rule aln_aa:
     input: 
-        ids=outdir+"/seeds/{seed}/{i}/{i}_{mode}.top",
+        ids=outdir+"/seeds/{seed}/{i}/{i}_{mode}.ids",
         fa=rules.make_blastdb.output.fa
     output:
         seq=outdir+"/seeds/{seed}/{i}/{i}_{mode}_aa.seqs",

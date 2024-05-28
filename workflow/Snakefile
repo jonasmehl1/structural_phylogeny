@@ -31,9 +31,24 @@ outdir=config['outdir']+config['dataset']
 # possible combinations:
 combinations_codes_str=[x+"_"+y for x in codes for y in codes]
 
-plots = ["homology", "saturation", "runtime", "astral_pro", "trees", "discordance", "singletons"]
+# mattypes = ['fident', 'alntmscore', 'lddt']
+modes = ['blast', 'fs', 'common', 'union']
+methods = ['blast', 'fs']
+
+alphabets = ['aa', '3Di']
+alphabets_fident = ['aa', '3Di', 'fident']
+
+models=["3Di", "QT", "LG", "GTR", "FT"]
+combinations=["3Di_3Di", "aa_QT", "aa_LG", "3Di_GTR", "3Di_FT", "3Di_FTPY"]
+combinations_ML=["3Di_3Di", "aa_LG", "3Di_GTR"]
+
+plots = ["homology", "saturation", "runtime", "astral_pro", "trees", "discordance", "singletons", "distance", "examples"]
 
 rule all:
     input:
+        expand(outdir+"/homology/{seed}_blast_brh.tsv", seed=config['seed']),
+        expand(outdir+"/homology/{seed}_fs_brh.tsv", seed=config['seed']),
         outdir+'/db/db_num.tsv',
-        expand(outdir+"/plots/{seed}_{plot}.pdf", seed=config['seed'], plot=plots)
+        expand(outdir+"/plots/{seed}_{plot}.pdf", seed=config['seed'], plot=plots),
+        expand(outdir+"/plots/{seed}_foldmason", seed=config['seed']),
+        expand(config['gff_dir']+'{code}.gff', code=config['seed'])

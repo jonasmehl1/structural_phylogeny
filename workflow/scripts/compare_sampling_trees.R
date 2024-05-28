@@ -35,7 +35,7 @@ fs <- read_delim(snakemake@input[["fs"]],
          qcov*100>snakemake@params[["coverage"]], 
          tcov*100>snakemake@params[["coverage"]]) %>% 
   group_by(query) %>% 
-  mutate(is_top = row_number()<=snakemake@params[["max_seqs"]]) %>% 
+  filter(row_number()<=snakemake@params[["max_seqs"]]) %>% 
   ungroup()
 
 blast <- read_delim(snakemake@input[["blast"]], 
@@ -46,7 +46,7 @@ blast <- read_delim(snakemake@input[["blast"]],
          length/qlen*100>snakemake@params[["coverage"]], 
          length/slen*100>snakemake@params[["coverage"]]) %>% 
   group_by(query) %>% 
-  mutate(is_top = row_number()<=snakemake@params[["max_seqs"]]) %>% 
+  filter(row_number()<=snakemake@params[["max_seqs"]]) %>% 
   ungroup()
 # $11<{params.eval_both} && $4/$15*100>{params.coverage} && $4/$16*100
 
@@ -58,19 +58,6 @@ df <- full_join(blast, fs,
          singleton = case_when(is.na(evalue_fs) ~ "only_blast",
                                is.na(evalue_blast) ~ "only_fs", 
                                .default = "common"))
-
-plot_top <- df %>% 
-  select(query, singleton, contains("is_top")) %>% 
-  group_by(singleton, is_top_blast, is_top_fs) %>% 
-  count() %>% 
-  filter(singleton=="common") %>%  
-  ggplot(aes(is_top_blast, is_top_fs, fill=n)) + 
-  geom_tile() + 
-  geom_text(aes(label=n), color="white") +
-  coord_cartesian(expand = F) + 
-  scale_fill_viridis_c(option = "E") +
-  labs("Common hits in top 150") +
-  theme(legend.position = "none")
 
 # first of all let's explore common properties:
 # bitscore, evalue, pident, prop mismatch and prop gaps
@@ -95,7 +82,7 @@ plot_common <- df %>%
   scale_x_continuous(expand = c(0,0)) +
   scale_linetype_manual(values = c(2,1)) + 
   labs(subtitle = "Common properties distribution") + 
-  theme(legend.position = "none")
+  theme(legend.position = "bottom")
 
 
 plot_fs <- df %>% 
@@ -108,34 +95,34 @@ plot_fs <- df %>%
   scale_y_continuous(expand = c(0, 0, 0.05, 0)) +
   scale_x_continuous(expand = c(0,0)) +
   labs(subtitle = "Foldseek properties distribution") + 
-  theme(legend.position = "bottom")
+  theme(legend.position = "none")
 
 
 plot_prop <- group_by(df) %>% 
   count(query, singleton) %>% 
   group_by(query) %>% 
   mutate(nn=sum(n), prop=n/nn) %>% 
-  ggplot(aes(prop, singleton, color=singleton)) + 
+  ggplot(aes(singleton, prop, color=singleton)) + 
   geom_boxplot() +
-  labs(subtitle = "Distribution of the proportion of singletons") + 
+  labs(subtitle = "Proportion of singletons") + 
   scale_color_manual(values = palette_singleton)+ 
   theme(legend.position = "none")
 
 
-plot_point <- group_by(df) %>% 
-  count(query, singleton) %>% 
-  pivot_wider(id_cols = query, names_from = singleton, values_from = n) %>% 
-  ggplot(aes(only_blast, only_fs, size=common, fill=common)) + 
-  geom_point(pch=21, alpha=.8) + 
-  # coord_fixed() +
-  # facet_grid(~proceed) +
-  scale_fill_viridis_c()+ 
-  labs(subtitle = "Scatter of singletons") + 
-  theme(legend.position = "bottom")
+# plot_point <- group_by(df) %>% 
+#   count(query, singleton) %>% 
+#   pivot_wider(id_cols = query, names_from = singleton, values_from = n) %>% 
+#   ggplot(aes(only_blast, only_fs, size=common, fill=common)) + 
+#   geom_point(pch=21, alpha=.8) + 
+#   # coord_fixed() +
+#   # facet_grid(~proceed) +
+#   scale_fill_viridis_c()+ 
+#   labs(subtitle = "Scatter of singletons") + 
+#   theme(legend.position = "bottom")
 
-out <- ((plot_prop/plot_top/plot_point) + plot_layout(heights = c(1,1,3)) | (plot_common/plot_fs)) + 
-  plot_layout(widths = c(1.3,1))
-ggsave(snakemake@output[[1]], out, width = 12, height = 8)
+out <- (plot_prop | (plot_fs/plot_common)) + 
+  plot_layout(widths = c(1,3))
+ggsave(snakemake@output[[1]], out, width = 10, height = 6)
 
 # it would be cool to check if positions overlap? 
 # if not, are they different from the common ones? i.e. another local hit

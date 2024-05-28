@@ -1,0 +1,147 @@
+---
+title: "Structural vs Sequence Dashboard"
+runtime: shiny
+output:
+  flexdashboard::flex_dashboard:
+    theme:
+      bg: "#FFFFFF"
+      fg: "#00a276"
+      primary: "#00a276"
+      base_font:
+        google: Roboto
+      code_font:
+        google: JetBrains Mono
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+# Install thematic and un-comment for themed static plots (i.e., ggplot2)
+# thematic::thematic_rmd()
+```
+
+## Column {.tabset data-width="650"}
+
+```{r libraries, message=FALSE, warning=FALSE}
+suppressPackageStartupMessages(library(ggtree))
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(ggmsa))
+library(patchwork)
+library(shiny)
+
+source("../scripts/functions.R")
+theme_set(theme_classic())
+```
+
+```{r input_files}
+models <- c("QT", "FT", "LG", "GTR", "3Di")
+
+ids_input <- "../../results/test/ids/UP000005640_examples.ids"
+trees <- "../../results/test/trees/UP000005640_unrooted_trees.txt"
+taxidmap <- "../../results/test/db/taxidmap"
+meta <- "../../data/meta/Hsap_taxon.csv"
+
+seeds <- readLines(ids_input)
+seed_sp <- gsub("_examples.ids", "", basename(ids_input))
+seed_dir <- gsub("trees", "seeds", dirname(trees))
+
+taxmap <- read_delim(taxidmap, 
+                     delim = "\t", col_names = c("label", "Tax_ID")) %>% 
+  left_join(read_delim(meta)) %>% 
+  dplyr::select(label, Proteome_ID, mnemo)
+
+fls <- list.files(paste0("~/mn5/projects/projects/structural_phylome/results/test/seeds/", seed_sp, "/", seeds),
+                  full.names = TRUE)
+ids <- fls[grepl("(blast|fs).*ids$", fls)]
+x <- sapply(ids, readLines, simplify = FALSE)
+names(x) <- gsub("\\.ids", "", basename(ids))
+alns <- fls[grepl("commo.*clean$", fls)]
+```
+
+```{r}
+selectInput("seed", label = "seed", choices = seeds)
+```
+
+```{r}
+venn_input <- reactive({
+  x[which(grepl(input$seed, names(x)))]
+})
+
+aln_3di_input <- reactive({
+  Biostrings::readAAMultipleAlignment(filepath = alns[grepl(paste0(input$seed,".*3Di.alg"), alns)])
+})
+
+aln_aa_input <- reactive({
+  Biostrings::readAAMultipleAlignment(filepath = alns[grepl(paste0(input$seed,".*aa.alg"), alns)])
+})
+
+# alns <- fls[grepl("commo.*clean$", fls)]
+#   
+# # 3Di aln
+# aln_3di <- Biostrings::readAAMultipleAlignment(alns[grepl("3Di.alg", alns)])
+# aln_3di_mat <- as.matrix(aln_3di@unmasked)
+# pos_df_3di <- tibble(pos=1:ncol(aln_3di_mat), 
+#                      cons=nrow(aln_3di_mat) - colSums(aln_3di_mat=="-" | aln_3di_mat=="X"))
+# 
+# aln_aa <- Biostrings::readAAMultipleAlignment(alns[grepl("aa.alg", alns)])
+# aln_aa_mat <- as.matrix(aln_aa@unmasked)
+# pos_df_aa <- tibble(pos=1:ncol(aln_aa_mat), 
+#                      cons=nrow(aln_aa_mat) - colSums(aln_aa_mat=="-" | aln_aa_mat=="X"))
+# 
+# trees_files <- fls[grepl("nwk$", fls)]
+# 
+# trees <- read.tree(text = sapply(trees_files, readLines))
+# names(trees) <- gsub(paste0(seed,"_|(3Di|aa)_|.nwk$"), "", basename(trees_files))
+
+# conf_df <- tibble(label=union(x$blast, x$fs)) %>% 
+#   left_join(taxmap) %>% 
+#   mutate(confidence_file=paste0("results/data/structures/",
+#                                 Proteome_ID,
+#                                 "/confidence/",
+#                                 label,
+#                                 "-confidence_v4.json.gz")) %>% 
+#   rowwise() %>% 
+#   mutate(conf=mean(jsonlite::fromJSON(gzfile(confidence_file))$confidenceScore))
+```
+
+### Venn
+
+```{r}
+renderPlot(
+  venn_input() %>% 
+    ggvenn::ggvenn(auto_scale = TRUE)
+)
+```
+
+### Alns 3di
+
+```{r aln 3di}
+
+renderPlot(
+  aln_3di_input() %>% 
+  ggmsa(seq_name = FALSE, font = NULL, show.legend = TRUE, border = NA) +
+    labs(title = paste(input$seed, "- 3Di common hits cleaned aln")) +
+    # geom_line(mapping = aes(x=pos, y=cons), data = pos_df_3di, inherit.aes = F) +
+    coord_cartesian() + 
+    theme_void() + 
+    theme(axis.text.x = element_text())
+)
+
+```
+
+### Aln AA
+
+```{r aln_aa}
+
+renderPlot(
+  aln_aa_input() %>% 
+  ggmsa(seq_name = FALSE, font = NULL, show.legend = TRUE, border = NA) +
+    labs(title = paste(input$seed, "- 3Di common hits cleaned aln")) +
+    # geom_line(mapping = aes(x=pos, y=cons), data = pos_df_3di, inherit.aes = F) +
+    coord_cartesian() + 
+    theme_void() + 
+    theme(axis.text.x = element_text())
+)
+
+```

@@ -1,6 +1,30 @@
-import foldseek2tree
 import numpy as np
 import pandas as pd
+
+def distmat_to_txt(identifiers, distmat, outfile):
+	'''
+	write out a distance matrix in fastme format
+
+	Parameters
+	----------
+	identifiers : list
+		list of identifiers for your proteins
+	distmat : np.array  
+		distance matrix
+	outfile : str   
+		path to output file
+
+	'''
+
+	#write out distmat in phylip compatible format
+	outstr = str(len(identifiers)) + '\n'
+	for i,pdb in enumerate(identifiers):
+		outstr += pdb + ' ' + ' '.join( [ "{:.4f}".format(d) for d in list( distmat[i,: ] )  ]  ) + '\n'
+	with open(outfile , 'w') as handle:
+		handle.write(outstr)
+		handle.close()
+	return outfile
+
 
 res = pd.read_table(snakemake.input[0], header = None)
 # print(res.head())
@@ -33,5 +57,5 @@ for i,k in enumerate(matrices):
     matrices[k] = 1-matrices[k]
     # print(matrices[k], np.amax(matrices[k]), np.amin(matrices[k]) )
     # np.save( infolder + k + '_distmat.npy' , matrices[k])
-    distmat_txt = foldseek2tree.distmat_to_txt(ids, matrices[k], snakemake.output[i])
+    distmat_txt = distmat_to_txt(ids, matrices[k], snakemake.output[i])
 

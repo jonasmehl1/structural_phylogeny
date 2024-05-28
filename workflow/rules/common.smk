@@ -1,4 +1,4 @@
-outdir=config['outdir']+config['dataset']
+# outdir=config['outdir']+config['dataset']
 
 rule trim_aln:
     input: outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.alg"
@@ -14,7 +14,7 @@ rule iqtree:
     output: 
         tree=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}.nwk",
         # treeline=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}.treeline",
-        ufboot=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}.ufboot",
+        # ufboot=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}.ufboot",
         iqtree=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}.iqtree"
     wildcard_constraints:
         model="GTR|LG|3Di"
@@ -34,20 +34,33 @@ elif [ "$model" == "3Di" ]; then
     model="3DI -mdef {params.submat}"
 fi
 
-iqtree2 -s {input} --prefix $tree_prefix -B {params.ufboot} -T {threads} --boot-trees --quiet \
+iqtree2 -s {input} --prefix $tree_prefix -B {params.ufboot} -T {threads}  --quiet \
 --mem 4G --cmin 4 --cmax 10 --mset $model
 
 mv ${{tree_prefix}}.treefile {output.tree}
 mv ${{tree_prefix}}.log {log}
 rm -f ${{tree_prefix}}.model.gz ${{tree_prefix}}.splits.nex ${{tree_prefix}}.contree ${{tree_prefix}}.ckp.gz
 '''
-
+# --boot-trees
 
 ##### FOLDTREE #####
 
+rule foldmason:
+    input: 
+        fa=outdir+"/seeds/{seed}/{i}/{i}_union_3Di.alg",
+        db=rules.make_foldseekdb.output
+    output: 
+        fa=temp(outdir+"/seeds/{seed}/{i}/{i}_union_3Di.alg.tmp"),
+        html=outdir+"/seeds/{seed}/{i}/{i}_union_3Di.html"
+    shell: '''
+cat <(seqkit grep -p "AF-{wildcards.i}-F1" {input.fa}) <(seqkit grep -v -p "AF-{wildcards.i}-F1" {input.fa}) |\
+seqkit replace -p $ -r -model_v4.cif.gz > {output.fa}
+foldmason msa2lddtreport {input.db} {output.fa} {output.html}
+'''
+
 rule foldseek_allvall_tree:
-    input: outdir+"/seeds/{seed}/{i}/{i}_{mode}.top"
-    output: outdir+"/seeds/{seed}/{i}/{i}_{mode}_allvall.txt"
+    input: outdir+"/seeds/{seed}/{i}/{i}_{mode}.ids"
+    output: temp(outdir+"/seeds/{seed}/{i}/{i}_{mode}_allvall.txt")
     params: config['structure_dir']
     log: outdir+"/log/foldseek/{seed}_{i}_{mode}.log"
     benchmark: outdir+"/benchmarks/foldseek/{seed}_{i}_{mode}.txt"
@@ -85,6 +98,37 @@ rule foldtree:
 quicktree -i m {input} | paste -s -d '' > {output}
 '''
 
+rule foldtree_py:
+    input: outdir+"/seeds/{seed}/{i}/{i}_{mode}.ids"
+    output:
+        distmat=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_FTPY.txt",
+        tree=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_FTPY.nwk"
+    wildcard_constraints:
+        alphabet="3Di"
+    params: config['structure_dir']
+    log: outdir+"/log/ft/{seed}_{i}_{mode}_{alphabet}_FTPY.log"
+    benchmark: outdir+"/benchmarks/ft/{seed}_{i}_{mode}_{alphabet}_FTPY.txt"
+    shell: '''
+indir=$(dirname {input})
+mkdir -p $indir/structs_{wildcards.mode}
+
+for id in $(cat {input}); do
+zcat {params}/*/high_cif/${{id}}-model_v4.cif.gz > $indir/structs_{wildcards.mode}/${{id}}.cif
+done
+
+python ./software/foldtree/foldtree.py -i $indir/structs_{wildcards.mode} -o $indir/{wildcards.i}_{wildcards.mode} \
+-t $TMPDIR/{wildcards.i}_{wildcards.mode}_ft --outtree {output.tree} -c $indir/{wildcards.i}_{wildcards.mode}_core \
+--corecut --correction --kernel fident > {log}
+
+rm -r $indir/structs_{wildcards.mode}
+rm -r $indir/{wildcards.i}_{wildcards.mode}_core
+rm {output.distmat}_fastme_stat.txt {output.distmat}.tmp
+rm $indir/{wildcards.i}_{wildcards.mode}_allvall.tsv
+rm $indir/{wildcards.i}_{wildcards.mode}_core_allvall.tsv
+'''
+# rm -r $TMPDIR/{wildcards.i}_{wildcards.mode}_ft
+
+
 rule quicktree:
     input: outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}.alg.clean"
     output: outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_QT.nwk"
@@ -99,14 +143,14 @@ esl-reformat stockholm {input} | quicktree -boot {params} -in a -out t /dev/stdi
 
 rule RangerDTL:
     input:
-        sptree=config['species_tree'],
+        sptree=config['species_tree_labels'],
         genetree=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}.nwk",
         taxidmap=rules.make_taxidmap_sp.output
-    output: outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}_DTL.txt"
+    output: 
+        full=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}_ranger.txt"
     shell:'''
 echo -e "$(cat {input.sptree})\\n$(nw_rename {input.genetree} {input.taxidmap})" | \
-Ranger-DTL.linux -i /dev/stdin  -o /dev/stdout -T 2000 -q -s | grep reco | \
-grep -E "[0-9]+" -o | paste -s -d'\\t' > {output}
+Ranger-DTL.linux -i /dev/stdin -o {output.full} -T 2000 -q
 '''
 
 rule root_tree:
@@ -117,34 +161,4 @@ rule root_tree:
 mad {input} > {log}
 sed -i \'2,$d\' {output}
 '''
-
-# rule foldtree:
-#     input: outdir+"/seeds/{seed}/{i}/{i}_{mode}.ids"
-#     output:
-#         distmat=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_FT.txt",
-#         tree=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_FT.nwk"
-#     wildcard_constraints:
-#         alphabet="3Di"
-#     params: config['structure_dir']
-#     log: outdir+"/log/ft/{seed}_{i}_{mode}_{alphabet}.log"
-#     benchmark: outdir+"/benchmarks/ft/{seed}_{i}_{mode}_{alphabet}.txt"
-#     shell: '''
-# indir=$(dirname {input})
-# mkdir -p $indir/structs_{wildcards.mode}
-
-# for id in $(cat {input}); do
-# zcat {params}/*/high_cif/${{id}}-model_v4.cif.gz > $indir/structs_{wildcards.mode}/${{id}}.cif
-# done
-
-# python ./software/foldtree/foldtree.py -i $indir/structs_{wildcards.mode} -o $indir/{wildcards.i}_{wildcards.mode} \
-# -t $TMPDIR/{wildcards.i}_{wildcards.mode}_ft --outtree {output.tree} -c $indir/{wildcards.i}_{wildcards.mode}_core \
-# --corecut --correction --kernel fident > {log}
-
-# rm -r $indir/structs_{wildcards.mode}
-# rm -r $indir/{wildcards.i}_{wildcards.mode}_core
-# rm {output.distmat}_fastme_stat.txt {output.distmat}.tmp
-# rm $indir/{wildcards.i}_{wildcards.mode}_allvall.tsv
-# rm $indir/{wildcards.i}_{wildcards.mode}_core_allvall.tsv
-# '''
-# rm -r $TMPDIR/{wildcards.i}_{wildcards.mode}_ft
 

@@ -26,6 +26,7 @@ nodes_df <- trees_df %>%
   left_join(nodes_clades) %>% 
   mutate(freq=f1+f2+f3)
 
+
 pp1_plot <- nodes_df %>% 
     ggplot(aes(q1, label, fill=model, color=model, group=model)) +
     geom_linerange(aes(x=x, xmin=xmin, xmax=xmax, color=model),
@@ -38,10 +39,10 @@ pp1_plot <- nodes_df %>%
                position = position_dodge(width=.7)) +
   scale_fill_manual(values=palettes_model) +
   scale_color_manual(values = palettes_model_d) +
-  scale_shape_manual(values = c(21,22,23)) +
+  scale_shape_manual(values = c(21,22,23,24)) +
   guides(color = guide_legend(override.aes = list(pch = 21, size=3)),
          shape = guide_legend(override.aes = list(size=3))) +
-  theme(legend.position = "bottom")
+  theme(legend.position = "bottom", legend.box="vertical")
 
 sptree_plot <- ggtree(labeled_sptree) + 
   geom_tiplab() + 

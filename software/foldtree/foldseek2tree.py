@@ -189,7 +189,7 @@ def postprocess(t, outree, delta=0 ):
 	print(tre)
 
 	for n in tre.treenode.traverse():
-		if n.dist< 0:
+		if n.dist < delta:
 			n.dist = delta
 	tre.write( outree, tree_format = 0 )
 

@@ -48,25 +48,25 @@ evals <- c(Inf, 1e-2, 1e-3, 1e-5)
 min_covs <- c(0, 30, 80)
 
 
-fs_brhs <- read_delim(snakemake@input[["fs_brh"]], col_names = c("query", "target"), show_col_types = FALSE) %>% 
-  mutate(method="blast_brh")
-  # group_by(query) %>%
-  # summarise(fs_brhs=list(target))
+# fs_brhs <- read_delim(snakemake@input[["fs_brh"]], col_names = c("query", "target"), show_col_types = FALSE) %>% 
+#   mutate(method="blast_brh")
+#   # group_by(query) %>%
+#   # summarise(fs_brhs=list(target))
 
-blast_brhs <- read_delim(snakemake@input[["blast_brh"]], col_names = c("query", "target"), show_col_types = FALSE) %>% 
-  mutate(method="fs_brh")
-  # group_by(query) %>%
-  # summarise(blast_brhs=list(target))
+# blast_brhs <- read_delim(snakemake@input[["blast_brh"]], col_names = c("query", "target"), show_col_types = FALSE) %>% 
+#   mutate(method="fs_brh")
+#   # group_by(query) %>%
+#   # summarise(blast_brhs=list(target))
 
-brhs <- rbind(blast_brhs, fs_brhs) %>% 
-  group_by(query, target, method) %>% 
-  mutate(n=1) %>% 
-  pivot_wider(names_from = method, values_fill = 0, values_from = n) %>% 
-  mutate(common = ifelse(fs_brh+blast_brh==2, 1, 0))
+# brhs <- rbind(blast_brhs, fs_brhs) %>% 
+#   group_by(query, target, method) %>% 
+#   mutate(n=1) %>% 
+#   pivot_wider(names_from = method, values_fill = 0, values_from = n) %>% 
+#   mutate(common = ifelse(fs_brh+blast_brh==2, 1, 0))
 
-grouped_brhs <- brhs %>%
-  group_by(query) %>% 
-  summarise(fs_brh = sum(fs_brh), blast_brh=sum(blast_brh), common_brh=sum(common))
+# grouped_brhs <- brhs %>%
+#   group_by(query) %>% 
+#   summarise(fs_brh = sum(fs_brh), blast_brh=sum(blast_brh), common_brh=sum(common))
 
 df <- full_join(select(blast, query, target, pident, evalue, bitscore, qcov),
                 select(fs, query, target, pident, evalue, bitscore, qcov),
@@ -181,61 +181,61 @@ plot_intersection <- df_overlap %>%
 
 
 # taxonomy plot
-taxo_df <- tibble()
+# taxo_df <- tibble()
 
-for (eval in evals) {
-  for (cov in min_covs) {
-    print(paste(eval, "-",cov))
-    add_bs <- blast %>%
-      filter(evalue < eval, qcov > cov) %>% 
-      left_join(table, by = c("staxids"="Tax_ID")) %>% 
-      group_by(query, Clade) %>% 
-      count() %>% 
-      group_by(Clade) %>% 
-      count(n>0) %>% 
-      mutate(n=n/length(unique(blast$query)), evalue=eval, cov=cov, method="blast", brh="All")
-    add_bs_brh <- blast %>%
-      filter(evalue < eval, qcov > cov) %>% 
-      inner_join(blast_brhs, by = c("query", "target")) %>% 
-      left_join(table, by = c("staxids"="Tax_ID")) %>% 
-      group_by(query, Clade) %>% 
-      count() %>% 
-      group_by(Clade) %>% 
-      count(n>0) %>% 
-      mutate(n=n/length(unique(blast$query)), evalue=eval, cov=cov, method="blast", brh="BRH")
-    add_fs <- fs %>%
-      filter(evalue < eval, qcov > cov/100) %>% 
-      left_join(table, by="Tax_ID") %>% 
-      group_by(query, Clade) %>% 
-      count() %>% 
-      group_by(Clade) %>% 
-      count(n>0) %>% 
-      mutate(n=n/length(unique(fs$query)), evalue=eval, cov=cov, method="fs", brh="All")
-    add_fs_brh <- fs %>%
-      filter(evalue < eval, qcov > cov/100) %>% 
-      inner_join(fs_brhs, by = c("query", "target")) %>% 
-      left_join(table, by="Tax_ID") %>% 
-      group_by(query, Clade) %>% 
-      count() %>% 
-      group_by(Clade) %>% 
-      count(n>0) %>% 
-      mutate(n=n/length(unique(fs$query)), evalue=eval, cov=cov, method="fs", brh="BRH")
-    taxo_df <- bind_rows(taxo_df, add_bs, add_bs_brh, add_fs, add_fs_brh)
-  }
-}
-
-
-
-taxo_plot <- ggplot(taxo_df) + 
-  geom_tile(aes(y=Clade, method, fill=n)) + 
-  # facet_grid(evalue~cov) +
-  ggh4x::facet_nested(brh~evalue+cov, scale = "free_y") +
-  # scale_fill_gradientn(colours = wespal) + 
-  scale_fill_viridis_c(option = "D") +
-  coord_cartesian(expand=0)
+# for (eval in evals) {
+#   for (cov in min_covs) {
+#     print(paste(eval, "-",cov))
+#     add_bs <- blast %>%
+#       filter(evalue < eval, qcov > cov) %>% 
+#       left_join(table, by = c("staxids"="Tax_ID")) %>% 
+#       group_by(query, Clade) %>% 
+#       count() %>% 
+#       group_by(Clade) %>% 
+#       count(n>0) %>% 
+#       mutate(n=n/length(unique(blast$query)), evalue=eval, cov=cov, method="blast", brh="All")
+#     add_bs_brh <- blast %>%
+#       filter(evalue < eval, qcov > cov) %>% 
+#       inner_join(blast_brhs, by = c("query", "target")) %>% 
+#       left_join(table, by = c("staxids"="Tax_ID")) %>% 
+#       group_by(query, Clade) %>% 
+#       count() %>% 
+#       group_by(Clade) %>% 
+#       count(n>0) %>% 
+#       mutate(n=n/length(unique(blast$query)), evalue=eval, cov=cov, method="blast", brh="BRH")
+#     add_fs <- fs %>%
+#       filter(evalue < eval, qcov > cov/100) %>% 
+#       left_join(table, by="Tax_ID") %>% 
+#       group_by(query, Clade) %>% 
+#       count() %>% 
+#       group_by(Clade) %>% 
+#       count(n>0) %>% 
+#       mutate(n=n/length(unique(fs$query)), evalue=eval, cov=cov, method="fs", brh="All")
+#     add_fs_brh <- fs %>%
+#       filter(evalue < eval, qcov > cov/100) %>% 
+#       inner_join(fs_brhs, by = c("query", "target")) %>% 
+#       left_join(table, by="Tax_ID") %>% 
+#       group_by(query, Clade) %>% 
+#       count() %>% 
+#       group_by(Clade) %>% 
+#       count(n>0) %>% 
+#       mutate(n=n/length(unique(fs$query)), evalue=eval, cov=cov, method="fs", brh="BRH")
+#     taxo_df <- bind_rows(taxo_df, add_bs, add_bs_brh, add_fs, add_fs_brh)
+#   }
+# }
 
 
-final_plot <- (pident_p | qcov_p | eval_p | norm_bit_p) / (plot_intersection + taxo_plot)
+
+# taxo_plot <- ggplot(taxo_df) + 
+#   geom_tile(aes(y=Clade, method, fill=n)) + 
+#   # facet_grid(evalue~cov) +
+#   ggh4x::facet_nested(brh~evalue+cov, scale = "free_y") +
+#   # scale_fill_gradientn(colours = wespal) + 
+#   scale_fill_viridis_c(option = "D") +
+#   coord_cartesian(expand=0)
+
+
+final_plot <- (pident_p | qcov_p | eval_p | norm_bit_p) / (plot_intersection)# + taxo_plot)
 
 ggsave(snakemake@output[["eda"]], final_plot, width = 14, height = 10, dpi = 300)
 

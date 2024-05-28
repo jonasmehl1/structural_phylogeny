@@ -1,0 +1,452 @@
+---
+title: "Structural analysis"
+# knit: (function(input_file, encoding) {
+#   rmarkdown::render(input_file,
+date: "`r format(Sys.time(), '%d-%b-%Y')`"
+author: "Giacomo Mutti"
+output:
+    rmdformats::html_clean:
+        number_sections: false
+        code_folding: hide
+        self_contained: true
+        fig_caption: true
+        # thumbnails: false
+        # lightbox: false
+        gallery: true
+        toc_depth: 3
+        highlight: kate
+---
+
+```{r setup, include=FALSE, dev="CairoPNG"}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE, cache.lazy = FALSE,
+                      crop = TRUE, dev="CairoPNG")
+knitr::knit_hooks$set(crop = knitr::hook_pdfcrop)
+knitr::opts_knit$set(root.dir = "../../")
+```
+
+```{r libraries, message=FALSE, warning=FALSE, cache=FALSE}
+library(tidyverse)
+library(patchwork)
+library(ggtree)
+library(cowplot)
+library(glue)
+source("workflow/scripts/functions.R")
+theme_set(theme_classic())
+
+models <- names(palettes_model)
+
+params <- yaml::read_yaml("config/params.yaml")
+params_dataset <- yaml::read_yaml("config/Hsapopi_test.yaml")
+
+outdir <- glue(params$outdir, params_dataset$dataset)
+```
+
+```{r read_stuff, cache=FALSE}
+seeds <- readLines(glue(outdir, "/ids/UP000005640_common.ids"))
+
+tax <- read_delim(params_dataset$taxons_file, show_col_types=F)
+taxmap <- read_delim(glue(outdir, "/db/taxidmap"), 
+                     delim = "\t", col_names = c("label", "Tax_ID"),
+                     show_col_types = FALSE) %>% 
+  left_join(tax, by = "Tax_ID") %>% 
+  dplyr::select(label, Proteome_ID, mnemo)
+
+taxidmap <- read_delim(glue(outdir,"/db/taxidmap"), 
+                       col_names = c("target", "Tax_ID"), show_col_types=F)
+
+sptree <- read.tree(params_dataset$species_tree_labels)
+translate <- deframe(distinct(dplyr::select(taxmap, Proteome_ID, mnemo)))
+# sptree$tip.label <- names(translate)[match(translate, sptree$tip.label)]
+
+species_dist_df <- tibble()
+for (sp in sptree$tip.label){
+  if (sp=="Hsap") {next}
+  dist <- castor::get_all_distances_to_tip(sptree, "Hsap")[MRCA(sptree, "Hsap", sp)]
+  mrca <- c(sptree$tip.label, sptree$node.label)[MRCA(sptree, "Hsap", sp)]
+  species_dist_df <- bind_rows(species_dist_df, tibble(mnemo=sp, value=dist, mrca=mrca))
+}
+
+# read input table
+lvls_tax <- rev(c(unique(tax$Clade), "archaea", "bacteria"))
+
+table_columns <- c('Proteome_ID', 'Tax_ID', 'count1', 'count2', 'count3', 
+                   'genome', 'source', 'species', 'mnemo')
+
+table <- read_delim(params_dataset$input_table_file, show_col_types=F, 
+                    delim = "\t", col_names = table_columns) %>% 
+  left_join(tax, by = "Tax_ID") %>% 
+  mutate(Clade = ifelse(is.na(Clade), mnemo, Clade),
+         Clade = factor(Clade, levels = lvls_tax))
+```
+
+# Homology
+
+```{r read_self_blast}
+blast_self <- read_delim(glue(outdir, "/homology/allvall/",
+                              params_dataset$seed, "_", params_dataset$seed, "_blast.tsv"),
+                         show_col_types=FALSE,
+                         col_names = blast_columns) %>% 
+  filter(query %in% seeds) %>%
+  filter(query==target) %>% 
+  mutate(blast_selfbit=bitscore) %>% 
+  select(query, blast_selfbit)
+
+fs_self <- read_delim(glue(outdir, "/homology/allvall/",
+                              params_dataset$seed, "_", params_dataset$seed, "_fs.tsv"), 
+                      show_col_types = FALSE,
+                         col_names = blast_columns) %>% 
+  filter(query %in% seeds) %>%
+  filter(query==target) %>% 
+  mutate(fs_selfbit=bitscore) %>% 
+  select(query, fs_selfbit)
+
+self <- full_join(blast_self, fs_self, by="query")
+```
+
+
+```{r read_fs}
+fs <- read_delim(glue(outdir, "/homology/", params_dataset$seed, "_fs.tsv"), 
+                 col_names = fs_columns, show_col_types = FALSE) %>% 
+  filter(query %in% seeds) %>%
+  mutate(evalue = ifelse(evalue==0, 1e-180, evalue)) %>%
+  left_join(taxidmap, by = "target")
+
+fs_brhs <- read_delim(glue(outdir, "/homology/", params_dataset$seed, "_fs_brh.tsv"),
+                     col_names = c("query", "target"), show_col_types = FALSE) %>% 
+  filter(query %in% seeds) %>%
+  mutate(method="fs_brh") 
+```
+
+
+```{r read_blast}
+blast <- read_delim(glue(outdir, "/homology/", params_dataset$seed, "_blast.tsv"), 
+                    col_names = blast_columns, show_col_types = FALSE) %>% 
+  filter(query %in% seeds) %>%
+  mutate(evalue = ifelse(evalue==0, 1e-180, evalue))
+
+blast_brhs <- read_delim(glue(outdir, "/homology/", params_dataset$seed, "_blast_brh.tsv"),
+                     col_names = c("query", "target"), show_col_types = FALSE) %>% 
+  filter(query %in% seeds) %>%
+  mutate(method="blast_brh")
+```
+
+```{r merge_homo}
+df <- full_join(blast, fs,
+                by = c("query", "target"), suffix=c("_blast", "_fs")) %>%
+    filter(query!=target) %>% 
+  left_join(self, by="query") %>%
+  mutate(pident_fs = 100*pident_fs, 
+         qcov_fs = 100*qcov_fs,
+         singleton = case_when(is.na(evalue_fs) ~ "only_blast",
+                               is.na(evalue_blast) ~ "only_fs", 
+                               .default = "common"),
+         blast_norm = bitscore_blast/blast_selfbit, fs_norm = bitscore_fs/fs_selfbit) 
+
+brhs <- rbind(blast_brhs, fs_brhs) %>% 
+    group_by(query, target, method) %>%
+    mutate(n=1) %>%
+    pivot_wider(names_from = method, values_fill = 0, values_from = n) %>%
+    mutate(common = ifelse(fs_brh+blast_brh==2, 1, 0))
+
+# grouped_brhs <- brhs %>%
+#   group_by(query) %>%
+#   summarise(fs_brh = sum(fs_brh), blast_brh=sum(blast_brh), common_brh=sum(common))
+```
+## Blast vs Foldseek
+
+There are these number of hits, divided by singleton class:
+
+```{r eda_homo}
+df %>% count(singleton)
+```
+
+We can explore different properties of blast and foldseek search divided by singleton class.
+
+<!-- ```{r blast_vs_fs, echo = FALSE, message=FALSE, fig.align='center', fig.cap='Some cool caption', out.width='\\linewidth', fig.pos='H'} -->
+<!-- knitr::include_graphics(glue(outdir, "/plots/", params_dataset$seed, "_homology.pdf")) -->
+<!-- ``` -->
+
+<center>
+![*Blast vs foldseek properties*](../../draft/figures/UP000005640_homology.png)
+</center>
+
+
+## BRHs
+
+We can explore the abundance of BRH hits for every seed protein across the different species.
+
+```{r brhs, fig.width=12}
+brhs %>% 
+  left_join(select(taxmap, -Proteome_ID), by=c("target"="label")) %>% 
+  mutate(mnemo=factor(mnemo, levels=sptree$tip.label)) %>% 
+  # pivot_longer(cols = c(blast_brh, fs_brh, common)) %>% 
+  filter(mnemo!="Hsap") %>% 
+  pivot_longer(cols = c(blast_brh, fs_brh, common)) %>% 
+  filter(value!=0) %>% 
+  ggplot(aes(mnemo, fill=name)) + 
+  geom_bar(position = "dodge") + 
+  scale_fill_manual(values = palette_brh) + 
+  scale_y_continuous(expand = expansion(0,0))
+# select(df, query, target, singleton) %>% 
+#   left_join(brhs) %>% 
+#   group_by(singleton) %>%
+#   summarise(#prop_brh = sum(!is.na(common))/n()*100,
+#             prop_blast_brh = sum(blast_brh, na.rm = T)/n()*100, 
+#             prop_fs_brh = sum(fs_brh, na.rm = T)/n()*100, 
+#             prop_common_brh = sum(common, na.rm = T)/n()*100) %>% 
+#   pivot_longer(!singleton) %>% 
+#   ggplot(aes(name, value, color=singleton)) + 
+#   geom_point(size=3) + 
+#   scale_color_manual(values=palette_singleton) + 
+#   labs(x="Type of BRH", y="% of BRH")
+```
+
+## Singletons structure quality
+
+```{r lddt_singletons, fig.width=10, fig.height=5}
+lddt_df <- read_delim(paste0(params$structure_dir, "/", tax$Proteome_ID, "/", tax$Proteome_ID, "_mean_plddt.tsv"),
+           col_names = c("target", "mean_lddt"), show_col_types = FALSE)
+
+df %>% 
+  select(target, singleton) %>% 
+  mutate(target=gsub("AF-|-F1", "", target)) %>% 
+  left_join(lddt_df, by="target") %>% 
+  ggplot(aes(mean_lddt, fill=singleton)) + 
+  geom_density(alpha=.5) +
+  scale_y_continuous(expand = expansion(0.01,0)) +
+  scale_x_continuous(expand = expansion(0.01,0)) +
+  scale_fill_manual(values = palette_singleton) 
+```
+
+We can see the meand plddt for singleton classes and common are generally better imputed proteins than the two singletons. Expectedly fs suffers more than blast.
+
+We can also see more in detail some blast and foldseek features and how they differ.
+
+<center>
+![*Foldseek and blast properties divided by singleton class*](../../draft/figures/UP000005640_singletons.png)
+</center>
+
+
+# Post filtering blast
+
+```{r filter_homo}
+aln_seeds <- paste0("AF-",readLines(glue(outdir, "/ids/",params_dataset$seed,"_aln.ids")), "-F1")
+blast_filtered <- filter(blast, 
+                         query %in% aln_seeds,
+                         length/qlen*100>params$coverage, 
+                         length/slen*100>params$coverage,
+                         evalue<as.numeric(params$eval_both)) %>% 
+  group_by(query) %>% 
+  slice_head(n = params$max_seqs) %>% 
+  ungroup()
+
+fs_filtered <- filter(fs, 
+                      query %in% aln_seeds,
+                      qcov*100>params$coverage, 
+                      tcov*100>params$coverage, 
+                      evalue<as.numeric(params$eval_both)) %>% 
+  group_by(query) %>% 
+  slice_head(n = params$max_seqs) %>% 
+  ungroup()
+```
+
+We filter blast and foldseek by `r params$coverage` query and target coverage and by `r params$eval_both` min evalue for our `r length(seeds)`. Only `r length(aln_seeds)` will go in the phylogenetic pipeline as they have more than 4 common hits. 
+This results in `r nrow(blast_filtered)` blast rows and `r nrow(fs_filtered)` fs rows.
+
+## Originations
+
+```{r originations}
+blast_originations <- blast_filtered %>% 
+  select(query, target) %>% 
+  left_join(taxmap, by=c("target"="label")) %>% 
+  group_by(query) %>% 
+  filter(mnemo!="Hsap") %>% 
+  left_join(species_dist_df, by="mnemo") %>% 
+  mutate(mrca=factor(mrca, levels=unique(species_dist_df$mrca), ordered = TRUE)) %>% 
+  summarise(mrca=max(mrca)) %>% 
+  group_by(mrca) %>% 
+  count() %>% 
+  mutate(method="blast")
+
+fs_originations <- fs_filtered %>% 
+  select(query, target) %>% 
+  left_join(taxmap, by=c("target"="label")) %>% 
+  group_by(query) %>% 
+  filter(mnemo!="Hsap") %>% 
+  left_join(species_dist_df, by="mnemo") %>% 
+  mutate(mrca=factor(mrca, levels=unique(species_dist_df$mrca), ordered = TRUE)) %>% 
+  summarise(mrca=max(mrca)) %>% 
+  group_by(mrca) %>% 
+  count() %>% 
+  mutate(method="fs")
+
+originations <- rbind(blast_originations, fs_originations)
+
+originations %>% 
+  ggplot(aes(n, fct_rev(mrca), fill=method)) + 
+  geom_bar(stat = "identity", position = "dodge") + 
+  scale_fill_manual(values = palettes_method) + 
+  scale_x_continuous(expand = expansion(0,0)) + 
+  labs(y="MRCA")
+```
+
+We can see where is the "taxonomic mrca" (the most distant species) for every seed. Interestingly, foldssek is more than blast just in the two last nodes.
+
+
+## Duplications
+
+```{r duplications}
+duplications_mrca <- read_delim(glue(outdir, "/reco/", params_dataset$seed,"_mrca.tsv"),
+                                show_col_types = FALSE) %>% 
+  separate(id, c("gene", "target", "alphabet", "model")) %>% 
+  select(-alphabet) %>% 
+  group_by(target, model, mrca) %>% 
+  summarise(n=sum(n)) %>% 
+  filter(model %in% c("LG", "FTPY")) %>% 
+  mutate(mrca=factor(mrca, levels=fortify(sptree) %>% arrange(y) %>% pull(label), ordered = TRUE))
+
+duplications_mrca %>% 
+  filter(target %in% c("blast", "fs")) %>%
+  ggplot(aes(n, mrca, fill=target)) + 
+  geom_bar(position = "dodge", stat="identity") +
+  facet_grid(~model) + 
+  scale_x_continuous(expand = expansion(0,0)) +
+  scale_fill_manual(values=palettes_method) 
+
+# fortify(sptree) %>% 
+#   inner_join(duplications_mrca, by=c("label"="mrca")) %>% 
+#   ggtree() + 
+#   geom_point(aes(size=n)) + 
+#   facet_grid(target~model)
+```
+
+We can also explore where the duplications called by RangerDTL are mapped in the species tree. For this we are only interested in *LG* and *FTPY* to reduce complexity.
+
+# Trees
+
+```{r read_trees}
+df_trees <- read_delim(glue(outdir, "/trees/", params_dataset$seed, "_unrooted_trees.txt"),
+                       show_col_types = FALSE,
+                       col_names = c("gene", "target", "alphabet", "model", "tree")) %>% 
+  mutate(model=factor(model, levels=models))
+```
+
+## Reconciliation
+
+<center>
+![*all 6 model results*](../../draft/figures/UP000005640_discordance.png)
+</center>
+
+
+<center>
+![*Astral-PRO results*](../../draft/figures/UP000005640_astral_pro.png)
+</center>
+
+
+<center>
+![*Distance 2 seed by singleton class*](../../draft/figures/UP000005640_distance.png)
+</center>
+
+
+## RF distance + varr2t
+
+<center>
+![*Various Tree analysis*](../../draft/figures/UP000005640_trees.png)
+</center>
+
+
+## Model fit
+
+How many times is each model better?
+
+```{r prop_better, fig.width=10}
+reco <- read_delim(glue(outdir, "/reco/", params_dataset$seed, "_DTL.tsv"), show_col_types = FALSE) %>%
+  mutate(model=factor(model, levels=models))
+
+scores <- read_delim(glue(outdir, "/reco/", params_dataset$seed, "_scores.tsv"), show_col_types = FALSE) %>%
+  left_join(reco) %>%
+  mutate(model=factor(model, levels=models))
+
+reco_prop_plot <- scores %>%
+  group_by(id, targets) %>%
+  mutate(norm_reco_score=(dups+losses)/n_tips) %>%
+  slice_min(norm_reco_score, with_ties = TRUE) %>%
+  mutate(best_score=1/n()) %>% 
+  ggplot(aes(targets, best_score, fill=model)) +
+  geom_bar(stat = "identity") +
+  labs(subtitle = "How many times each model has the lowest D+L/tips?") +
+  scale_fill_manual(values = palettes_model)
+
+tcs_prop_plot <- scores %>%
+  group_by(id, targets) %>%
+  slice_max(score, with_ties = TRUE) %>%
+  mutate(best_score=1/n()) %>% 
+  ggplot(aes(targets, best_score, fill=model)) +
+  geom_bar(stat = "identity") +
+  labs(subtitle = "How many times each model has the highest TCS score?") +
+  scale_fill_manual(values = palettes_model)
+
+reco_prop_plot + tcs_prop_plot +  plot_layout(guides = 'collect')
+```
+
+## Distance between target classes
+
+We can see the average normalized topological distance between the different groups in LG and FTPY.
+
+```{r targets_topodist, fig.width=10, fig.height=5}
+df_trees_dist <- filter(df_trees, model %in% c("LG", "FTPY"), target=="union")
+ts_dist <- read.tree(text = df_trees_dist$tree)
+names(ts_dist) <- paste(df_trees_dist$gene, df_trees_dist$target, df_trees_dist$alphabet, df_trees_dist$model, sep = "_")
+
+df_distance <- tibble()
+
+for (idx in 1:length(ts_dist)) {
+    seed <- paste0("AF-",df_trees_dist$gene[idx],"-F1")
+    tmp_df <- select(filter(df, query==seed), target, singleton)
+
+    tree_dist <- as.matrix(adephylo::distTips(ts_dist[[idx]], method = "nNodes")) %>% 
+      as.data.frame() %>% 
+      rownames_to_column() %>% 
+      pivot_longer(!rowname) %>% 
+      filter(rowname>name) %>%
+      mutate(value=value/max(value)) %>% 
+      left_join(tmp_df, by = c("rowname"="target")) %>% 
+      left_join(tmp_df, by = c("name"="target")) %>% 
+      mutate(a=pmin(singleton.x, singleton.y),
+             b=pmax(singleton.x, singleton.y)) %>% 
+      group_by(a, b) %>%
+      filter(!is.na(a), !is.na(b)) %>%
+      summarise(mean_dist=mean(value), n=n(), .groups = "keep") %>%
+      mutate(gene=seed, model=df_trees_dist$model[idx])
+
+  df_distance <- bind_rows(df_distance, tree_dist)
+}
+
+df_distance %>% 
+  group_by(a,b,model) %>% 
+  summarise(wmean=weighted.mean(mean_dist,n)) %>% 
+  ggplot(aes(a,b, fill=wmean)) + 
+  geom_tile() +
+  geom_text(aes(label=round(wmean,2))) +
+  facet_grid(~model) +
+  scale_fill_gradientn(colors=wespal) +
+  coord_cartesian(expand = F) +
+  theme(axis.title = element_blank(),
+        legend.position = "none")
+```
+
+# CATH/SCOPe
+
+# Runtimes
+
+<center>
+![*Various runtimes statistics*](../../draft/figures/UP000005640_runtime.png)
+</center>
+
+# TODOs 
+
+* CATH/SCOPe
+* Benchmark: fix runtimes!
+* Fix FTPY branch support
+* Foldtree smk vs Foldtree python: DONE
+* duplication in species tree: DONE

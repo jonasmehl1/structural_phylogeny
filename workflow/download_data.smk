@@ -1,13 +1,18 @@
 import glob
 import pandas as pd
 
-uniprot_genomes = 'data/meta/uniprot_genomes.tsv'
-sequence_dir = 'data/fastas/'
-structure_dir = 'data/structures/'
-outdir = 'results/'
+# User-specified dataset-specific config file
+dataset_config_file = config.get("dataset_config_file", None)
 
-low_confidence = 40
+# Load fixed config parameters
+configfile: "config/params.yaml"
 
+# Check if the dataset-specific config file is provided
+if dataset_config_file is not None:
+    # Load dataset-specific parameters
+    configfile: dataset_config_file
+
+structure_dir=config['structure_dir']
 # dataset specific info
 seed=config['seed']
 files = ['cif', 'pae', 'confidence']
@@ -20,10 +25,10 @@ codes = list(input_table['uniprot'])
 
 rule all:
     input:
-        expand('data/ids/{code}.txt', code=codes),
+        # expand('data/ids/{code}.txt', code=codes),
         # expand(structure_dir+'{code}/cif', code=codes),
-        expand(structure_dir+'{code}/pae', code=codes),
-        expand(structure_dir+'{code}/confidence', code=codes),
+        # expand(structure_dir+'{code}/pae', code=codes),
+        # expand(structure_dir+'{code}/confidence', code=codes),
         expand(structure_dir+'{code}/low_cif', code=codes),
         expand(structure_dir+'{code}/high_cif', code=codes)
 
@@ -31,7 +36,7 @@ rule all:
 
 rule download_pdbs:
     output:
-        directory(structure_dir+'raw_files/{code}')
+        temp(directory(structure_dir+'raw_files/{code}'))
     params:
         taxid=lambda wcs: str(input_dict[wcs.code]['taxid'])
     shell:'''
@@ -44,14 +49,14 @@ cd $currdir
 
 rule download_uniprot_ids:
     output:
-        ids='data/ids/{code}.txt'
+        ids=structure_dir+'{code}/{code}.txt'
         # rev_ids='data/ids/{code}_rev.txt'
     params:
         taxid=lambda wcs: str(input_dict[wcs.code]['taxid'])
     shell: '''
 set +o pipefail;
 
-kingdom=$(grep {wildcards.code} {uniprot_genomes} | cut -f2 | taxonkit reformat -I 1 -f "{{k}}" | cut -f2)
+kingdom=$(echo {params.taxid} | taxonkit reformat -I 1 -f "{{k}}" | cut -f2)
 url=ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/$kingdom/{wildcards.code}/{wildcards.code}_{params.taxid}.fasta.gz
 
 if curl --head --silent --fail $url 2> /dev/null; then
@@ -101,6 +106,8 @@ rule move_lowconf:
         stats=structure_dir+'{code}/{code}_mean_plddt.tsv',
         low_dir=directory(structure_dir+'{code}/low_cif'),
         high_dir=directory(structure_dir+'{code}/high_cif')
+    params:
+        config['low_confidence']
     shell:'''
 mkdir -p {output.low_dir}
 mkdir -p {output.high_dir}
@@ -111,7 +118,7 @@ for struct in {input.conf}/*json.gz; do
     avg_lddt=$(zcat $struct | jq '.confidenceScore |  add/length*1000 | round/1000')
     echo -e "$protein\\t$avg_lddt" >> {output.stats}
 
-    if (( $(echo "$avg_lddt < {low_confidence}" | bc -l) )); then
+    if (( $(echo "$avg_lddt < {params}" | bc -l) )); then
         cp {input.cif}/AF-${{protein}}-F1-model_v4.cif.gz {output.low_dir}
     else 
         cp {input.cif}/AF-${{protein}}-F1-model_v4.cif.gz {output.high_dir}

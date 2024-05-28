@@ -2,6 +2,15 @@
 
 From a given taxon sampling and a given seed species compute a normal sequence based phylome and a novel structure based phylome.
 
+## Download PDBs
+
+`snakemake -s workflow/download_data.smk --configfile config/Hsapopi.yaml --until download_pdbs -p -j2`
+
+This first pipeline is necessary to get all input files. From the input table (with uniprot codes and taxid mostly) we can download all the pdbs from google and then consider only those with mean average quality > `params["low_confidence"]` value. These will be moved into the `high_cif` folder for each proteome.
+
+The problematic thing is the dependency on gsutil which is a bit of a pain to install.
+
+
 ## Prokaryotic genomes
 
 See notebook: **workflow/notebooks/prokaryote_sampling.html**
@@ -42,13 +51,15 @@ Train a RF model on sequence and structure features with verticality as outcome 
 
 # TODOs
 
-- [ ] trimming differences may be interesting!
+- [ ] Add union set
+- [ ] Add plot of distance to seed divided by targets, rooting?
 - [ ] treestats file
-- [ ] measure if blast singletons have different distributions compared to common hits
 - [ ] Model TCS or DL score with alignment and tree statistics, this you could do it in a Rmd
+- [ ] trimming differences may be interesting!
 
 # Done
 
+- [x] measure if blast singletons have different distributions compared to common hits
 - [x] update download data smk
 - [x] implement ranger inside snakemake rule!
 - [x] What to do with astral pro trees?
