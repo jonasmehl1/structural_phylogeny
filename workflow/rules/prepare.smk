@@ -42,11 +42,17 @@ rule make_taxidmap:
 grep ">" {input} | sed 's/>//' | awk '{{print $0"\\t"{params.taxid}}}' > {output}
 '''
 
-
 rule get_gff:
     output: config['gff_dir']+'{code}.gff'
     shell: '''
-wget "https://rest.uniprot.org/uniprotkb/stream?format=gff&query=%28%28proteome%3A{wildcards.code}%29%29+AND+%28reviewed%3Atrue%29" -O {output}  
+wget "https://rest.uniprot.org/uniprotkb/stream?format=gff&query=%28%28proteome%3A{wildcards.code}%29%29" \
+-O /dev/stdout | awk 'NF' > {output}  
+'''
+
+rule get_CATH:
+    output: config['cath_dir']+'{code}_cath.tsv'
+    shell: '''
+wget "https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cxref_pfam%2Cxref_gene3d&format=tsv&query=%28%28proteome%3A{wildcards.code}%29%29" -O {output}  
 '''
 
 # rule merge_gff:

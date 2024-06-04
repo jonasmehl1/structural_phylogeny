@@ -51,14 +51,15 @@ Train a RF model on sequence and structure features with verticality as outcome 
 
 # TODOs
 
-- [ ] Add union set
-- [ ] Add plot of distance to seed divided by targets, rooting?
+- [ ] SCOP/CATH analysis
 - [ ] treestats file
 - [ ] Model TCS or DL score with alignment and tree statistics, this you could do it in a Rmd
-- [ ] trimming differences may be interesting!
 
 # Done
 
+- [x] Add union set
+- [x] Add plot of distance to seed divided by targets, rooting?
+- [x] trimming differences may be interesting!
 - [x] measure if blast singletons have different distributions compared to common hits
 - [x] update download data smk
 - [x] implement ranger inside snakemake rule!

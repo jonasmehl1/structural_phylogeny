@@ -85,7 +85,7 @@ rule plot_examples:
         reco=rules.merge_Ranger.output.DTLs,
         sptree=config['species_tree_labels'],
         meta=config['taxons_file'],
-        gff=config['gff_dir']+'{seed}.gff'
+        gff=expand(config['gff_dir']+'{code}.gff', code=codes)
     params: seed=config["seed"]
     output: outdir+"/plots/{seed}_examples.pdf"
     script: "../scripts/plot_example.R"

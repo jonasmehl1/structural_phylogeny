@@ -23,18 +23,22 @@ sptree <- read.tree(snakemake@input[["sptree"]])
 translate <- deframe(distinct(dplyr::select(taxmap, Proteome_ID, mnemo)))
 sptree$tip.label <- names(translate)[match(translate, sptree$tip.label)]
 
-species_dist_df <- as.matrix(adephylo::distTips(sptree, method = "nNodes"))[snakemake@params[["seed"]], ] %>% 
+species_dist_df <- as.matrix(adephylo::distTips(sptree, method = "nNodes"))[seed_sp, ] %>% 
   enframe(name = "Proteome_ID", value = "dist")
 
-gff <- rtracklayer::readGFF(snakemake@input[["gff"]]) %>%
-  as_tibble() %>% 
-  filter(seqid %in% c(seeds), 
-         type %in% c(interesting_types, "Chain"))
+gff <- read_delim(c(snakemake@input[["gff"]]), 
+                  delim = "\t", comment = "#", 
+                  col_names = c("seqid", "source", "type",
+                                "start", "end", "score",
+                                "strand", "phase", "rest"),
+                  show_col_types = FALSE) %>% 
+  filter(type %in% c(interesting_types, "Chain"))
 
 reco <- read_delim(snakemake@input[["reco"]], show_col_types = FALSE) %>% 
   mutate(model=factor(model, levels=models))
 
 plot_list = list()
+plot_domains = list()
 
 for (seed in seeds) {
   print(seed)
@@ -81,16 +85,17 @@ for (seed in seeds) {
 
   seqs <- Biostrings::readAAStringSet(fls[grepl("union.*_aa.seqs", fls)])
   length <- nchar(as.character(seqs[[paste0("AF-", seed, "-F1")]]))
-  prot <- tibble(seqid=seed, start=1, end=length)
+  prot <- as.data.frame(seqs@ranges) %>% 
+    mutate(seqid=gsub("AF-|-F1", "", names))
   
   plot_seed <- gff %>%
     filter(seqid==seed, type!="Chain") %>% 
     rowwise() %>% 
-    mutate(Note=ifelse(length(Note)==0, "", Note)) %>% 
+    mutate(Note=gsub(";..*", "", gsub("Note=", "", rest))) %>% 
     # filter(!type %in% c("Helix", "Beta strand", "Turn")) %>% 
     ggplot() + 
-    geom_segment(aes(x=start, xend=end,
-                     y=seqid, yend=seqid), data = prot) +
+    geom_segment(aes(x=1, xend=width,
+                     y=seqid, yend=seqid), data = filter(prot, seqid==seed)) +
     geom_segment(aes(x=start, xend=end,
                      y=seqid, yend=seqid, color=type), 
                  linewidth = 3) + 
@@ -160,6 +165,10 @@ for (seed in seeds) {
     facet_grid(targets~model, scales = "free") + 
     scale_color_manual(values = c(seed="black", palette_singleton))
 
+  a <- plot_dom(trees[["union_LG"]], seed, gff, prot, singleton_df, "LG")
+  b <- plot_dom(trees[["union_FT"]], seed, gff, prot, singleton_df, "FT")
+  plot_tree_domain <- (a[[2]] | a[[1]]) | (b[[2]] | b[[1]])
+
   plot_ranger <- reco %>% 
     filter(id==seed) %>% 
     left_join(singleton_df_red) %>% 
@@ -189,7 +198,9 @@ for (seed in seeds) {
     theme(legend.position = "bottom", legend.title=element_blank(),
           legend.key.size = unit(0.3, "cm"))
 
-  title <- filter(gff, seqid==seed, type=="Chain") %>% pull(Note) %>% simplify()
+  title <- filter(gff, seqid==seed, type=="Chain") %>%
+    mutate(Note=gsub(";..*", "", gsub("Note=", "", rest))) %>% 
+    pull(Note) %>% simplify()
   title <- ifelse(is.null(title), seed, paste(seed, "-", title))
 
   first_row <- (plot_seed | plot_venn) + plot_layout(widths = c(4.5,1))
@@ -199,10 +210,12 @@ for (seed in seeds) {
     plot_annotation(title = title, subtitle = subtitle, tag_levels = "A")
   
   plot_list[[seed]] = outplot
+  plot_domains[[seed]] = plot_tree_domain
 }
 
 pdf(snakemake@output[[1]], width = 16, height = 16)
 for (i in names(plot_list)) {
   print(plot_list[[i]])
+  print(plot_domains[[i]])
 }
 dev.off()

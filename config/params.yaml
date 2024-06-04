@@ -36,6 +36,7 @@ subst_matrix_tree: 'resources/subst_matrixes/3DI.nexus'
 sequence_dir: 'results/data/fastas/'
 structure_dir: 'results/data/structures/'
 gff_dir: 'results/data/gffs/'
+cath_dir: 'results/data/cath/'
 
 outdir: 'results/'
 

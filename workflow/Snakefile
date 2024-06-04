@@ -51,4 +51,4 @@ rule all:
         outdir+'/db/db_num.tsv',
         expand(outdir+"/plots/{seed}_{plot}.pdf", seed=config['seed'], plot=plots),
         expand(outdir+"/plots/{seed}_foldmason", seed=config['seed']),
-        expand(config['gff_dir']+'{code}.gff', code=config['seed'])
+        expand(config['cath_dir']+'{code}_cath.tsv', code=codes)

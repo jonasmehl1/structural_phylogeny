@@ -33,6 +33,10 @@ wespal <- wesanderson::wes_palette("Zissou1", 100, type = "continuous")
 palettes_step <- c( "#F0E442", "#009E73", "#CC79A7")
 names(palettes_step) <- c("foldtree", "iqtree", "quicktree")
 
+palette_domains <- c("#31b7bcff", "#95c11fff")
+names(palette_domains) <- c("Pfam", "3d")
+
+
 add_marginal <- function(df, plot, x, y, fill, palette){
   xdens <- axis_canvas(plot, axis = "x")+
     geom_density(data = df, aes(x = .data[[x]], fill = .data[[fill]]),
@@ -83,3 +87,44 @@ get_idxs_df <- function(seqs, aln, trimmed) {
   }
   return(df_idxs)
 }
+
+
+plot_dom <- function(tree, seed, gff, prot, singleton_df, title="") {
+
+  tree <- ape::root(tree, paste0("AF-", seed, "-F1"), resolve.root=TRUE)
+  tree$edge.length <- (tree$edge.length/max(diag(ape::vcv(tree))))
+
+  lbls <- fortify(tree, ladderize = FALSE) %>% 
+    filter(isTip) %>% 
+    arrange(y) %>% 
+    pull(label)
+
+  a <- gff %>%
+    filter(seqid %in% gsub("AF-|-F1", "", tree$tip.label), type=="Domain") %>% 
+    mutate(Note=gsub(";..*", "", gsub("Note=", "", rest)),
+           seqid=factor(seqid, levels=gsub("AF-|-F1", "", lbls), ordered = TRUE)) %>% 
+    ggplot(aes(x=start, xend=end, y=seqid, yend=seqid)) + 
+    geom_segment(aes(x=1, xend=width,
+                     y=seqid, yend=seqid), 
+                 data = prot %>% mutate(seqid=factor(seqid, levels=gsub("AF-|-F1", "", lbls), ordered = TRUE))) +
+    geom_segment(aes(x=start, xend=end,
+                     y=seqid, yend=seqid, color=Note),  
+                 linewidth = 2) + 
+    geom_text(aes(label = Note, x=(start+end)/2, y=seqid), size=2) +
+    theme_void() +
+    labs(title = title) +
+    theme(legend.position = "none")
+  
+  b <- fortify(tree, ladderize = FALSE) %>% 
+    left_join(singleton_df, by="label") %>% 
+    mutate(singleton = ifelse(label==paste0("AF-", seed, "-F1"), "seed", singleton)) %>%
+    ggtree(ladderize = FALSE) + 
+    # geom_tiplab() +
+    geom_tippoint(aes(color=singleton)) +
+    scale_color_manual(values = c(seed="black", palette_singleton)) + 
+    # scale_x_continuous(limits = c(0,3)) +
+    theme(legend.position = "none") 
+  
+  return (list(a, b))
+}
+
