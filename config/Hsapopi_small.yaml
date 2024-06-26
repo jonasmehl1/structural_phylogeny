@@ -8,4 +8,4 @@ seed: ['UP000005640']
 root: 'Atha'
 
 # this is the number of seed genes to run the pipeline
-test_seeds: 20
+test_seeds: 5

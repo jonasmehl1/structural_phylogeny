@@ -1,7 +1,7 @@
 suppressPackageStartupMessages(library(tidyverse))
 suppressPackageStartupMessages(library(ggtree))
 suppressPackageStartupMessages(library(patchwork))
-suppressPackageStartupMessages(library(ggpubr))
+# suppressPackageStartupMessages(library(ggpubr))
 source("workflow/scripts/functions.R")
 
 theme_set(theme_classic())

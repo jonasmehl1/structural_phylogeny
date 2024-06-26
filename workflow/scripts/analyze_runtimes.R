@@ -7,7 +7,7 @@ df <- read_delim(snakemake@input[["time"]],
                  show_col_types = FALSE) %>% 
   mutate(basename=gsub(".txt", "", basename),
          step=basename(dirname),
-         max_rss_gb = measurements::conv_unit(max_rss, from = "MB", to = "GB")) %>% 
+         mutate(max_rss_gb = max_rss/1024)) %>% 
   separate(basename, c("seed", "gene", "method", "alphabet", "model"))
 
 

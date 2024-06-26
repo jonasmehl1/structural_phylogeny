@@ -5,8 +5,7 @@ combinations=["3Di_3Di", "aa_QT", "aa_LG", "3Di_GTR", "3Di_FT", "3Di_FTPY"]
 
 rule plot_evalues:
     input:
-        table=config['input_table_file'],
-        groups=config['taxons_file'],
+        table=rules.get_taxon_file.output,
         taxidmap=rules.make_blastdb.output.mapid,
         blast=rules.blast.output,
         # blast_brh=rules.blast_brh.output,
@@ -20,17 +19,14 @@ rule plot_evalues:
     output: 
         eda=outdir+"/plots/{seed}_homology.pdf",
         saturation=outdir+"/plots/{seed}_saturation.pdf"
+    conda: "../envs/sp_R.yaml"
     script: "../scripts/compare_sampling.R"
-#     shell:'''
-# Rscript workflow/scripts/compare_sampling.R -i {input.table} -m {input.groups} -t {input.taxidmap} \
-# -b {input.blast} -f {input.fs} --bb {input.blast_brh} --fb {input.fs_brh} \
-# --sb {input.self_blast} --sf {input.self_fs} -o {output.eda} --o2 {output.saturation} -e {params.eval_both} -s {params.max_seqs}
-# '''
+
 
 rule plot_evalues_trees:
     input:
-        table=config['input_table_file'],
-        groups=config['taxons_file'],
+        table=rules.get_taxon_file.output,
+        # groups=config['taxons_file'],
         taxidmap=rules.make_blastdb.output.mapid,
         blast=rules.blast.output,
         fs=rules.foldseek.output
@@ -40,6 +36,7 @@ rule plot_evalues_trees:
         coverage=config['coverage'],
         max_seqs=config['max_seqs']
     output: outdir+"/plots/{seed}_singletons.pdf"
+    conda: "../envs/sp_R.yaml"
     script: "../scripts/compare_sampling_trees.R"
 
 
@@ -53,6 +50,7 @@ rule plot_blens:
         coverage=config['coverage'],
         max_seqs=config['max_seqs']
     output: outdir+"/plots/{seed}_distance.pdf"
+    conda: "../envs/sp_R.yaml"
     script: "../scripts/analyze_bl.R"
 
 
@@ -83,9 +81,9 @@ rule plot_examples:
         ids=rules.get_examples_ids.output,
         taxidmap=rules.make_blastdb.output.mapid,
         reco=rules.merge_Ranger.output.DTLs,
-        sptree=config['species_tree_labels'],
-        meta=config['taxons_file'],
-        gff=expand(config['gff_dir']+'{code}.gff', code=codes)
+        sptree=config['species_tree'],
+        # meta=config['taxons_file'],
+        gff=expand(config['data_dir']+'gffs/{code}.gff', code=codes)
     params: seed=config["seed"]
     output: outdir+"/plots/{seed}_examples.pdf"
     script: "../scripts/plot_example.R"
@@ -93,10 +91,11 @@ rule plot_examples:
 ### Comparisons
 
 rule get_lineage:
-    input: config['input_table_file']
+    input: rules.get_taxon_file.output
     output: temp(outdir+"/reco/{seed}_lineage.tsv")
+    conda: "../envs/sp_utils.yaml"
     shell:'''
-cut -f2,9 {input} | taxonkit reformat -I 1 | sed 's/;/,/g' > {output}
+cut -f2,3 {input} | taxonkit reformat -I 1 | sed 's/;/,/g' | awk 'NR>1' > {output}
 '''
 
 rule get_verticality:
@@ -108,7 +107,8 @@ rule get_verticality:
     output:
         # ranger=temp(outdir+"/reco/{seed}_ranger.tsv"),
         outdir+"/reco/{seed}_scores.tsv"
-    script:"../../software/foldtree/compute_scores.py"
+    conda: "../envs/sp_python.yaml"
+    script:"../scripts/foldtree/compute_scores.py"
 
 
 rule plot_trees:
@@ -120,6 +120,7 @@ rule plot_trees:
     output:
         model=outdir+"/plots/{seed}_trees.pdf",
         reco=outdir+"/plots/{seed}_discordance.pdf"
+    conda: "../envs/sp_R.yaml"
     script: "../scripts/compare_trees.R"
 
 
@@ -129,6 +130,7 @@ rule get_runstats:
         aln=outdir+"/stats/{seed}_aln.stats",
         time=outdir+"/stats/{seed}_runtime.stats"
     threads: 12
+    conda: "../envs/sp_utils.yaml"
     shell:'''
 basedir=$(dirname {input} | rev | cut -f2- -d'/' | rev | sort -u)
 seqkit stats $basedir/*/*alg* -j {threads} -a -b -T | cut -f1,4,6,12 > {output.aln}
@@ -143,21 +145,23 @@ rule plot_runstats:
         aln=rules.get_runstats.output.aln,
         time=rules.get_runstats.output.time
     output: outdir+"/plots/{seed}_runtime.pdf"
+    conda: "../envs/sp_R.yaml"
     script: "../scripts/analyze_runtimes.R"
 
 rule prepare_astral_pro:
     input:
-        table=config['input_table_file'],
+        table=rules.get_taxon_file.output,
         taxidmap=rules.make_blastdb.output.mapid
     output:
         outdir+"/reco/gene_species.map"
+    conda: "../envs/sp_utils.yaml"
     shell:'''
-csvtk join -H -t -f 2 -L {input.taxidmap} {input.table} | cut -f1,10 > {output}
+csvtk join -H -t -f 2 -L {input.taxidmap} {input.table} | cut -f1,4 > {output}
 '''
 
 rule support_astral_pro:
     input:
-        sptree=config['species_tree_labels'],
+        sptree=config['species_tree'],
         genemap=rules.prepare_astral_pro.output,
         trees=rules.get_unrooted_trees.output.trees,
     output: 
@@ -165,6 +169,7 @@ rule support_astral_pro:
         st=outdir+"/reco/{seed}_{mode}_{alphabet}_{model}_apro_support.nwk"
     log: outdir+"/log/apro/{seed}_{mode}_{alphabet}_{model}_apro.log"
     params: config['root']
+    conda: "../envs/sp_tree.yaml"
     shell:'''
 awk '$2=="{wildcards.mode}" && $3=="{wildcards.alphabet}" && $4=="{wildcards.model}"' {input.trees} | \
 cut -f5 > {output.gt}
@@ -186,11 +191,12 @@ astral-pro -c {input.sptree} -a {input.genemap} -u 2 -i {output.gt} -o {output.s
 
 rule plot_astral_pro:
     input:
-        sptree=config['species_tree_labels'],
-        groups=config['taxons_file'],
+        sptree=config['species_tree'],
+        table=rules.get_taxon_file.output,
         trees=expand(outdir+"/reco/{seed}_{mode}_{comb}_apro_support.nwk", seed=config['seed'], mode=modes, comb=combinations)
         # sptrees=expand(outdir+"/reco/{seed}_{mode}_{alphabet}_apro_sptree.nwk", seed=config['seed'], mode=modes, alphabet=alphabets_fident)
     output: outdir+"/plots/{seed}_astral_pro.pdf"
+    conda: "../envs/sp_R.yaml"
     script: "../scripts/analyze_apro.R"
 # reco_dir=$(dirname {input.trees} | sort -u)
 

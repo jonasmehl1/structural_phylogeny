@@ -12,7 +12,7 @@ nodes_clades <- fortify(labeled_sptree) %>%
   mutate(label_int = fct_reorder(label, y)) %>%
   select(label_int, ordered)
 
-clades <- read_delim(snakemake@input[["groups"]], show_col_types = FALSE)
+clades <- read_delim(snakemake@input[["table"]], show_col_types = FALSE)
 
 apro_files <- snakemake@input[["trees"]]
 apro_trees <- read.tree(text = sapply(apro_files, readLines))

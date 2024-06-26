@@ -2,61 +2,52 @@
 
 From a given taxon sampling and a given seed species compute a normal sequence based phylome and a novel structure based phylome.
 
-## Download PDBs
+## Usage
 
-`snakemake -s workflow/download_data.smk --configfile config/Hsapopi.yaml --until download_pdbs -p -j2`
+### Data preparation
 
-This first pipeline is necessary to get all input files. From the input table (with uniprot codes and taxid mostly) we can download all the pdbs from google and then consider only those with mean average quality > `params["low_confidence"]` value. These will be moved into the `high_cif` folder for each proteome.
+The first thing must be installing snakemake and you can easily do this with this conda command
 
-The problematic thing is the dependency on gsutil which is a bit of a pain to install.
+```
+conda create  -c conda-forge -c bioconda -n snakemake snakemake hdf5 snakefmt snakedeploy
+```
+
+First of all you need to download the data, to do this you need a config file with X columns. You also need gsutil (follow these instructions for [gsutil installation](https://cloud.google.com/storage/docs/gsutil_install)) as it is quite difficult to install it is the only dependency that you'll need to manage alone. Once you have these you can run:
+
+`snakemake -s workflow/download_data.smk --configfile config/test.yaml -p -j2 --sdm conda`
+
+This first pipeline is necessary to get all input files. From the input table (with uniprot codes and taxid mostly) we can download all the pdbs from google and then consider only those entries with mean average quality > `params["low_confidence"]` value. These will be moved into the `high_cif` folder for each proteome.
+
+You can change the directory where all these data are stored with `params["data_dir"]` parameter but I would just use the default one.
+
+### Phylogeny pipeline
+
+## Conda envs
+
+```
+conda create -n sp_utils taxonkit seqkit csvtk
+conda create -n sp_R r-tidyverse r-phytools r-adephylo r-ape r-phangorn r-patchwork r-wesanderson r-ggdist r-ggrepel r-ggrepel r-ggh4x bioconductor-ggtree bioconductor-biostrings bioconductor-ggmsa
+conda create -n sp_homology foldseek blast
+conda create -n sp_tree iqtree quicktree mafft trimal hmmer gxx
+conda create -n sp_python python biopython pandas numpy fastme toytree tqdm scipy statsmodels cmake
+```
 
 
-## Prokaryotic genomes
-
-See notebook: **workflow/notebooks/prokaryote_sampling.html**
-
-## Important softwares:
-
-* [foldseek](https://github.com/steineggerlab/foldseek)
-* [foldtree](https://github.com/DessimozLab/fold_tree)
-* [3d-blast](http://3d-blast.life.nctu.edu.tw/dbsas.php)
-* [quicktree](https://github.com/khowe/quicktree)
-* [PDB_tool](https://github.com/realbigws/PDB_Tool): useful parsers and format converters
-* [hhsuite](https://github.com/soedinglab/hh-suite/tree/master): some useful parsers
-* [ProstT5](https://github.com/mheinzinger/ProstT5)
-
-# Benchmarking
-
-1. Compute Common ids trees: ml, foldtree, structml and compare RF and verticality
-2. compute Foldseek ids: best method among foldtree or structml
-3. compute Blast ids
-4. Then compare trees from 2 and 3 and see if removing singletons makes the tree better
-
-### Verticality
-
-- Ranger-DTL: plot gene family binned by size (1-5,5-10...) against # of events
-- TCS score as used in foldtree (Moi et al 2023)
-
-nw_rename A1A5D9_blast_aa.ufboot new_map > test.nwk
-then you can run ALE, however ALE cannot be used with foldtree
-
-### Random Forest classifier of which method could be better
-
-Train a RF model on sequence and structure features with verticality as outcome to predict if a gene family could be better analyzed with seq or struc
 
 # Issues
 
-* Rooting with MAD may be useful, check for what?
-* no core cut in foldtree
+* RangerDTL 404 installation!
 
 # TODOs
 
-- [ ] SCOP/CATH analysis
-- [ ] treestats file
-- [ ] Model TCS or DL score with alignment and tree statistics, this you could do it in a Rmd
+- [ ] Better Documentation
+- [ ] Implement Conda
 
 # Done
 
+- [x] treestats file
+- [x] Model TCS or DL score with alignment and tree statistics, this you could do it in a Rmd
+- [x] SCOP/CATH analysis
 - [x] Add union set
 - [x] Add plot of distance to seed divided by targets, rooting?
 - [x] trimming differences may be interesting!

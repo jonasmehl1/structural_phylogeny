@@ -20,8 +20,9 @@ include: 'rules/checks.smk'
 include: 'rules/common.smk'
 include: 'rules/analysis.smk'
 
-input_table = pd.read_csv(config['input_table_file'], header=None, sep='\t')
-input_table.columns = ['uniprot', 'taxid', 'count1', 'count2', 'count3', 'genome', 'source', 'species', 'mnemo']
+
+input_table = pd.read_csv(config['taxids'], sep='\t')
+input_table.columns = ['uniprot', 'taxid', 'mnemo']
 input_dict = input_table.set_index('uniprot').T.to_dict()
 
 codes = list(input_table['uniprot'])
@@ -38,8 +39,8 @@ methods = ['blast', 'fs']
 alphabets = ['aa', '3Di']
 alphabets_fident = ['aa', '3Di', 'fident']
 
-models=["3Di", "QT", "LG", "GTR", "FT"]
-combinations=["3Di_3Di", "aa_QT", "aa_LG", "3Di_GTR", "3Di_FT", "3Di_FTPY"]
+# models=["3Di", "QT", "LG", "GTR", "FT"]
+combinations=config["combinations"]
 combinations_ML=["3Di_3Di", "aa_LG", "3Di_GTR"]
 
 plots = ["homology", "saturation", "runtime", "astral_pro", "trees", "discordance", "singletons", "distance", "examples"]
@@ -51,4 +52,4 @@ rule all:
         outdir+'/db/db_num.tsv',
         expand(outdir+"/plots/{seed}_{plot}.pdf", seed=config['seed'], plot=plots),
         expand(outdir+"/plots/{seed}_foldmason", seed=config['seed']),
-        expand(config['cath_dir']+'{code}_cath.tsv', code=codes)
+        expand(config['data_dir']+'cath/{code}_cath.tsv', code=codes)

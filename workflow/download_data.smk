@@ -12,13 +12,13 @@ if dataset_config_file is not None:
     # Load dataset-specific parameters
     configfile: dataset_config_file
 
-structure_dir=config['structure_dir']
+data_dir=config['data_dir']
 # dataset specific info
 seed=config['seed']
 files = ['cif', 'pae', 'confidence']
 
-input_table = pd.read_csv(config['input_table_file'], header=None, sep='\t')
-input_table.columns = ['uniprot', 'taxid', 'count1', 'count2', 'count3', 'genome', 'source', 'species', 'mnemo']
+input_table = pd.read_csv(config['taxids'], sep='\t')
+input_table.columns = ['uniprot', 'taxid', 'mnemo']
 input_dict = input_table.set_index('uniprot').T.to_dict()
 
 codes = list(input_table['uniprot'])
@@ -26,17 +26,16 @@ codes = list(input_table['uniprot'])
 rule all:
     input:
         # expand('data/ids/{code}.txt', code=codes),
-        # expand(structure_dir+'{code}/cif', code=codes),
-        # expand(structure_dir+'{code}/pae', code=codes),
-        # expand(structure_dir+'{code}/confidence', code=codes),
-        expand(structure_dir+'{code}/low_cif', code=codes),
-        expand(structure_dir+'{code}/high_cif', code=codes)
-
+        # expand(data_dir+'{code}/cif', code=codes),
+        # expand(data_dir+'{code}/pae', code=codes),
+        # expand(data_dir+'{code}/confidence', code=codes),
+        expand(data_dir+'structures/{code}/low_cif', code=codes),
+        expand(data_dir+'structures/{code}/high_cif', code=codes)
 
 
 rule download_pdbs:
     output:
-        temp(directory(structure_dir+'raw_files/{code}'))
+        temp(directory(data_dir+'structures/raw_files/{code}'))
     params:
         taxid=lambda wcs: str(input_dict[wcs.code]['taxid'])
     shell:'''
@@ -49,7 +48,7 @@ cd $currdir
 
 rule download_uniprot_ids:
     output:
-        ids=structure_dir+'{code}/{code}.txt'
+        ids=data_dir+'structures/{code}/{code}.txt'
         # rev_ids='data/ids/{code}_rev.txt'
     params:
         taxid=lambda wcs: str(input_dict[wcs.code]['taxid'])
@@ -74,9 +73,9 @@ rule untar_pdbs:
         ids=rules.download_uniprot_ids.output,
         files=rules.download_pdbs.output
     output:
-        cif=temp(directory(structure_dir+'{code}/cif')),
-        pae=directory(structure_dir+'{code}/pae'),
-        conf=directory(structure_dir+'{code}/confidence')
+        cif=temp(directory(data_dir+'structures/{code}/cif')),
+        pae=directory(data_dir+'structures/{code}/pae'),
+        conf=directory(data_dir+'structures/{code}/confidence')
     shell:'''
 mkdir -p {output.cif}
 mkdir -p {output.pae}
@@ -103,9 +102,9 @@ rule move_lowconf:
         conf=rules.untar_pdbs.output.conf,
         cif=rules.untar_pdbs.output.cif
     output: 
-        stats=structure_dir+'{code}/{code}_mean_plddt.tsv',
-        low_dir=directory(structure_dir+'{code}/low_cif'),
-        high_dir=directory(structure_dir+'{code}/high_cif')
+        stats=data_dir+'structures/{code}/{code}_mean_plddt.tsv',
+        low_dir=directory(data_dir+'structures/{code}/low_cif'),
+        high_dir=directory(data_dir+'structures/{code}/high_cif')
     params:
         config['low_confidence']
     shell:'''
