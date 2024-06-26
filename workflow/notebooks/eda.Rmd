@@ -354,6 +354,7 @@ df_trees <- read_delim(glue(outdir, "/trees/", params_dataset$seed, "_unrooted_t
 ![*Various Tree analysis*](../../draft/figures/UP000005640_trees.png)
 </center>
 
+First of all we can explore the model selection for the 3 different Maximum likelihood trees (GTR, 3Di and LG). We can see how the BIC scores between GTR and 3Di change and that generally 3DI seems to fit better (when BIC 3DI-BIC GTR < 0 it means that the 3di model is better). ModelFinder generally agrees for +R and +G across models. This is different for +F as it is clearly different when comparing LG and either of the structure models. For what concerns +I (Inv) this pattern is less clear. This could be explained as sequences and structure (although recoded) do not evolve in the same way and the empirical frequencies of the recoded status have completely different interpretations.
 
 ## Model fit
 

@@ -7,9 +7,10 @@ source("workflow/scripts/functions.R")
 
 labeled_sptree <- read.tree(snakemake@input[["sptree"]])
 nodes_clades <- fortify(labeled_sptree) %>% 
-  filter(!isTip) %>% 
-  mutate(label = fct_reorder(label, y)) %>% 
-  select(node, label)
+  # filter(!isTip) %>% 
+  mutate(ordered = rank(y)) %>% 
+  mutate(label_int = fct_reorder(label, y)) %>%
+  select(label_int, ordered)
 
 clades <- read_delim(snakemake@input[["groups"]], show_col_types = FALSE)
 
@@ -18,8 +19,10 @@ apro_trees <- read.tree(text = sapply(apro_files, readLines))
 names(apro_trees) <- sapply(str_split(basename(apro_files), "_"), function(x) paste0(x[2], "_", x[4]))
 
 trees_df <- fortify(apro_trees) 
-nodes_df <- trees_df %>% 
-  separate(.id, c("targets", "model")) %>% 
+nodes_df <- trees_df %>%   group_by(.id) %>% 
+  mutate(ordered = rank(y)) %>% 
+  left_join(nodes_clades) %>% 
+  separate(.id, c("targets", "model")) %>%  
   filter(!isTip, label!="") %>% 
   mutate(label = gsub("\\[|\\]|\\'", "", str_replace_all(label, "[a-z]{1,2}[0-9]=", ""))) %>% 
   separate(label, c("pp1", "pp2", "pp3", "f1", "f2", "f3", "q1", "q2", "q3"), ";", convert = TRUE) %>% 

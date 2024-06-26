@@ -16,14 +16,18 @@ palettes_model <- c("#BF360C", "#75C323", "#40A79D", "#FFA000", "#D4E157","#646B
 names(palettes_model) <- models
 palettes_model_d <- colorspace::darken(palettes_model, amount = 0.6)
 names(palettes_model_d) <- models
+# "#FF0000" "#00A08A" "#F2AD00" "#F98400" "#5BBCD6"
 
-palettes_method <- c("#F23030", "#F29F05", "#267365", "#D6FAB7")
+palettes_method <- c("#00A08A", "#d63a3a", "#ffaa0e", "#6f63bb")
 names(palettes_method) <- c("common", "blast", "fs", "union")
 
-palette_singleton <- c("#F23030", "#F29F05", "#267365", "#D6FAB7")
+palette_singleton <- c("#00A08A", "#d63a3a", "#ffaa0e", "#6f63bb")
 names(palette_singleton) <- c("common", "only_blast", "only_fs", "union")
 
-palette_brh <- c("#F23030","#F29F05", "#267365")
+palette_singleton_p <- c("#00A08A", "#d63a3a", "#ffaa0e", "#6f63bb")
+names(palette_singleton_p) <- c("Common", "only Blast", "only Foldseek", "Union")
+
+palette_brh <- c("#00A08A","#d63a3a", "#ffaa0e")
 names(palette_brh) <- c("common","blast_brh", "fs_brh")
 
 palettes_alphabet <- c("#327AD9", "#BF3475", "#F29F05")
