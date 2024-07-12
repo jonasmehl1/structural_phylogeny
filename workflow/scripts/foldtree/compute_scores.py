@@ -25,7 +25,7 @@ if __name__ == '__main__':
             targets = line[1]
             alphabet = line[2]
             model = line[3]
-            tree = toytree.tree(line[4], format = 0)
+            tree = toytree.tree(line[4], tree_format = 0)
             tree = treescore.label_leaves(tree, taxidmap, uniprot_df)
             overlap = treescore.getTaxOverlap(tree.treenode)
 

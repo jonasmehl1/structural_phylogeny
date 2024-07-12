@@ -19,22 +19,25 @@ apro_trees <- read.tree(text = sapply(apro_files, readLines))
 names(apro_trees) <- sapply(str_split(basename(apro_files), "_"), function(x) paste0(x[2], "_", x[4]))
 
 trees_df <- fortify(apro_trees) 
-nodes_df <- trees_df %>%   group_by(.id) %>% 
+nodes_df <- trees_df %>%
+  group_by(.id) %>% 
   mutate(ordered = rank(y)) %>% 
   left_join(nodes_clades) %>% 
   separate(.id, c("targets", "model")) %>%  
   filter(!isTip, label!="") %>% 
   mutate(label = gsub("\\[|\\]|\\'", "", str_replace_all(label, "[a-z]{1,2}[0-9]=", ""))) %>% 
-  separate(label, c("pp1", "pp2", "pp3", "f1", "f2", "f3", "q1", "q2", "q3"), ";", convert = TRUE) %>% 
+  separate(label,
+           c("pp1", "pp2", "pp3", "f1", "f2", "f3", "q1", "q2", "q3"), ";", 
+           convert = TRUE) %>% 
   left_join(nodes_clades) %>% 
   mutate(freq=f1+f2+f3)
 
 
 pp1_plot <- nodes_df %>% 
-    ggplot(aes(q1, label, fill=model, color=model, group=model)) +
+    ggplot(aes(q1, label_int, fill=model, color=model, group=model)) +
     geom_linerange(aes(x=x, xmin=xmin, xmax=xmax, color=model),
                    data = . %>% 
-                     group_by(model, label) %>% 
+                     group_by(model, label_int) %>% 
                      summarise(x=mean(q1), xmin=min(q1), xmax=max(q1)),
                    position = position_dodge(width=.7), color="grey70"
                    ) +

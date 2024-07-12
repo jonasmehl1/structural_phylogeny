@@ -6,8 +6,9 @@ low_confidence: 40
 min_len: 0
 
 combinations: ["3Di_3Di", "aa_QT", "aa_LG", "3Di_GTR", "3Di_FT"]
+combinations_ML: ["3Di_3Di", "aa_LG", "3Di_GTR"]
 #, "3Di_FTPY"]
-
+modes: ['blast', 'fs', 'common', 'union']
 
 # target per queries in both foldseek and blast
 target_seqs: 1000

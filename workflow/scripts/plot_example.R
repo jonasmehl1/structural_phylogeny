@@ -8,13 +8,13 @@ theme_set(theme_classic())
 
 seeds <- readLines(snakemake@input[["ids"]])
 
-seed_sp <- gsub("_examples.ids", "", basename(snakemake@input[["ids"]]))
+seed_sp <- snakemake@params[["seed"]]
 seed_dir <- gsub("trees", "seeds", dirname(snakemake@input[["trees"]]))
 
 taxmap <- read_delim(snakemake@input[["taxidmap"]], 
                      delim = "\t", col_names = c("label", "Tax_ID"),
                      show_col_types = FALSE) %>% 
-  left_join(read_delim(snakemake@input[["meta"]],
+  left_join(read_delim(snakemake@input[["table"]],
                        show_col_types = FALSE), by = "Tax_ID") %>% 
   dplyr::select(label, Proteome_ID, mnemo)
 
@@ -42,7 +42,7 @@ plot_domains = list()
 
 for (seed in seeds) {
   print(seed)
-  fls <- list.files(paste0("results/test/seeds/", seed_sp, "/", seed), full.names = TRUE)
+  fls <- list.files(paste0(seed_dir, "/", seed_sp, "/", seed), full.names = TRUE)
   ids <- fls[grepl("(blast|fs).*ids$", fls)]
 
   x <- sapply(ids, readLines, simplify = FALSE)
@@ -70,7 +70,7 @@ for (seed in seeds) {
 
   conf_df <- tibble(label=union(x$blast, x$fs)) %>% 
     left_join(taxmap, by="label") %>% 
-    mutate(confidence_file=paste0("results/data/structures/",
+    mutate(confidence_file=paste0(snakemake@params[["struct_dir"]],
                                   Proteome_ID,
                                   "/confidence/",
                                   label,
@@ -122,7 +122,8 @@ for (seed in seeds) {
     summarise(mn=mean(conf)) %>% 
     mutate(scaled_mn=length(names(seqs))*mn/100)
   
-  plot_3di_aln <- ggmsa(aln_3di_trimmed, seq_name = FALSE, font = NULL, show.legend = TRUE, border = NA) +
+  plot_3di_aln <- ggmsa(aln_3di_trimmed, seq_name = FALSE, 
+                        font = NULL, show.legend = TRUE, border = NA) +
     labs(title = paste(seed, "- 3Di union hits cleaned aln")) + 
     geom_line(mapping = aes(x=pos_trim, y=scaled_mn), data = scaled_conf_df, inherit.aes = F) +
     coord_cartesian() + 

@@ -6,7 +6,8 @@ cp bin/astral-pro $CONDA_PREFIX/bin/
 cd -
 
 # install Ranger-DTL
-# wget https://compbio.mit.edu/ranger-dtl/ranger-dtl-linux.tar.gz -O $CONDA_PREFIX/lib/RangerDTL.tar.gz
-# tar xvzf $CONDA_PREFIX/lib/RangerDTL.tar.gz -C $CONDA_PREFIX/bin/ #--strip-components=2 ./bin/foldmason
+wget https://compbio.engr.uconn.edu/wp-content/uploads/sites/2447/2019/08/Linux.zip -O $CONDA_PREFIX/lib/RangerDTL.zip
+unzip $CONDA_PREFIX/lib/RangerDTL.zip -d $CONDA_PREFIX/lib/RangerDTL
+chmod +x $CONDA_PREFIX/lib/RangerDTL/Linux/CorePrograms/*
+mv $CONDA_PREFIX/lib/RangerDTL/Linux/CorePrograms/* $CONDA_PREFIX/bin/
 
-# 404 error. let's wait and see if they fix it, for now use one already installed.

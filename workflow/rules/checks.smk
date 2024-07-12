@@ -74,7 +74,7 @@ def seeds_homology(wildcards):
     with open(checkpoint_output) as all_genes:
         seed_genes = [gn.strip() for gn in all_genes]
         parsed_seed_genes = [gn.split('-')[1] for gn in seed_genes]
-    return expand(outdir+"/seeds/{seed}/{i}/{i}_common.ids", seed=wildcards.seed, i=parsed_seed_genes, mode=modes)
+    return expand(outdir+"/seeds/{seed}/{i}/{i}_common.ids", seed=wildcards.seed, i=parsed_seed_genes, mode=config["modes"])
 
 checkpoint check_orphans:
     input: seeds_homology
@@ -102,7 +102,7 @@ def seeds_unrooted_trees(wildcards):
     with open(checkpoint_output) as all_genes:
         seed_genes = [gn.strip() for gn in all_genes]
     outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_{mode}_{comb}.nwk", 
-                      seed=wildcards.seed, i=seed_genes, mode=modes, comb=combinations)
+                      seed=wildcards.seed, i=seed_genes, mode=config["modes"], comb=config["combinations"])
     return outfiles
 
 def common_trees(wildcards):
@@ -110,7 +110,7 @@ def common_trees(wildcards):
     with open(checkpoint_output) as all_genes:
         seed_genes = [gn.strip() for gn in all_genes]
     outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_common_{comb}.nwk", 
-                      seed=wildcards.seed, i=seed_genes, comb=combinations)
+                      seed=wildcards.seed, i=seed_genes, comb=config["combinations"])
     return outfiles
 
 def fs_trees(wildcards):
@@ -118,7 +118,7 @@ def fs_trees(wildcards):
     with open(checkpoint_output) as all_genes:
         seed_genes = [gn.strip() for gn in all_genes]
     outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_fs_{comb}.nwk", 
-                      seed=wildcards.seed, i=seed_genes, comb=combinations)
+                      seed=wildcards.seed, i=seed_genes, comb=config["combinations"])
     return outfiles
 
 def blast_trees(wildcards):
@@ -126,7 +126,7 @@ def blast_trees(wildcards):
     with open(checkpoint_output) as all_genes:
         seed_genes = [gn.strip() for gn in all_genes]
     outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_blast_{comb}.nwk", 
-                      seed=wildcards.seed, i=seed_genes, comb=combinations)
+                      seed=wildcards.seed, i=seed_genes, comb=config["combinations"])
     return outfiles
 
 
@@ -135,7 +135,7 @@ def union_trees(wildcards):
     with open(checkpoint_output) as all_genes:
         seed_genes = [gn.strip() for gn in all_genes]
     outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_union_{comb}.nwk", 
-                      seed=wildcards.seed, i=seed_genes, comb=combinations)
+                      seed=wildcards.seed, i=seed_genes, comb=config["combinations"])
     return outfiles
 
 checkpoint check_union_trees:
@@ -223,7 +223,7 @@ def seeds_treefiles(wildcards):
     with open(checkpoint_output) as all_genes:
         seed_genes = [gn.strip() for gn in all_genes]
     outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_{mode}_{comb}.iqtree", 
-                      seed=wildcards.seed, i=seed_genes, mode=modes, comb=combinations_ML)
+                      seed=wildcards.seed, i=seed_genes, mode=config["modes"], comb=config["combinations_ML"])
     return outfiles
 
 
@@ -246,8 +246,8 @@ def seeds_rangers(wildcards):
     with open(checkpoint_output) as all_genes:
         seed_genes = [gn.strip() for gn in all_genes]
     outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_{mode}_{comb}_ranger.txt", 
-                      seed=wildcards.seed, i=seed_genes, mode=modes, 
-                      comb=combinations)
+                      seed=wildcards.seed, i=seed_genes, mode=config["modes"], 
+                      comb=config["combinations"])
     return outfiles
 
 rule merge_Ranger:

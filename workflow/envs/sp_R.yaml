@@ -16,3 +16,4 @@ dependencies:
   - r-tidyverse
   - r-wesanderson
   - r-cowplot
+  - r-ggvenn

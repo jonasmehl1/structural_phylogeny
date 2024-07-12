@@ -1,8 +1,3 @@
-# outdir=config['outdir']+config['dataset']
-# type of diff matrixed for foldtree
-modes = ['blast', 'fs', 'common', 'union']
-combinations=["3Di_3Di", "aa_QT", "aa_LG", "3Di_GTR", "3Di_FT", "3Di_FTPY"]
-
 rule plot_evalues:
     input:
         table=rules.get_taxon_file.output,
@@ -82,10 +77,13 @@ rule plot_examples:
         taxidmap=rules.make_blastdb.output.mapid,
         reco=rules.merge_Ranger.output.DTLs,
         sptree=config['species_tree'],
-        # meta=config['taxons_file'],
+        table=rules.get_taxon_file.output,
         gff=expand(config['data_dir']+'gffs/{code}.gff', code=codes)
-    params: seed=config["seed"]
+    params: 
+        seed=config["seed"],
+        struct_dir=config["data_dir"]+"structures/"
     output: outdir+"/plots/{seed}_examples.pdf"
+    conda: "../envs/sp_R.yaml"
     script: "../scripts/plot_example.R"
 
 ### Comparisons
@@ -193,8 +191,8 @@ rule plot_astral_pro:
     input:
         sptree=config['species_tree'],
         table=rules.get_taxon_file.output,
-        trees=expand(outdir+"/reco/{seed}_{mode}_{comb}_apro_support.nwk", seed=config['seed'], mode=modes, comb=combinations)
-        # sptrees=expand(outdir+"/reco/{seed}_{mode}_{alphabet}_apro_sptree.nwk", seed=config['seed'], mode=modes, alphabet=alphabets_fident)
+        trees=expand(outdir+"/reco/{seed}_{mode}_{comb}_apro_support.nwk", 
+                     seed=config['seed'], mode=config["modes"], comb=config["combinations"])
     output: outdir+"/plots/{seed}_astral_pro.pdf"
     conda: "../envs/sp_R.yaml"
     script: "../scripts/analyze_apro.R"

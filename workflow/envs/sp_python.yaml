@@ -3,12 +3,12 @@ channels:
   - conda-forge
 dependencies:
   - biopython
+  - cmake
   - fastme
   - numpy
   - pandas
-  - python
+  - python==3.10
   - scipy
   - statsmodels
-  - toytree
+  - toytree[version='<3']
   - tqdm
-  - cmake

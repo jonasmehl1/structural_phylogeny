@@ -252,6 +252,7 @@ pident_p <- ggplot(df, aes(pident_Blast, pident_Foldseek)) +
   coord_fixed(expand = 0) +
   scale_x_continuous(limits = c(0, 100)) +
   scale_y_continuous(limits = c(0, 100)) +
+  labs(x="Identity Blast",y="Identity Foldseek") +
   theme(legend.position = "none", panel.grid = element_blank())
 pident_p <- add_marginal(df, pident_p, "pident_Blast", "pident_Foldseek", "singleton", palette_singleton_p)
 
@@ -261,6 +262,7 @@ qcov_p <- ggplot(df, aes(qcov_Blast, qcov_Foldseek)) +
   geom_vline(xintercept = min_covs, linetype=2) + 
   scale_x_continuous(limits = c(0, 100)) +
   scale_y_continuous(limits = c(0, 100)) +
+  labs(x="Query cov. Blast",y="Query cov. Foldseek") +
   scale_fill_gradientn(colors=wespal) +
   coord_fixed(expand = 0) +
   theme(legend.position = "none", panel.grid = element_blank()) 
@@ -274,7 +276,8 @@ lddt_p <- df %>%
   # scale_y_continuous(expand = c(0.01,0)) +
   # scale_x_continuous(limits = c(params$low_confidence, 100),
   #                    expand = c(0,0)) +
-  scale_color_manual(values = palette_singleton_p)+ 
+  scale_color_manual(values = palette_singleton_p) + 
+  labs(x="LDDT") + 
   theme(legend.position = "none", 
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank())
@@ -284,6 +287,7 @@ alntmscore_p <- df %>%
   ggplot(aes(color=singleton, alntmscore)) + 
   geom_density() + 
   # coord_cartesian(expand = 0) +
+  labs(x="TM-Score") + 
   scale_color_manual(values = palette_singleton_p)+ 
   theme(legend.position = "none", 
         axis.text.y = element_blank(),
@@ -297,7 +301,8 @@ plddt_p <- df %>%
   geom_density(bw=1) + 
   # scale_y_continuous(expand = c(0.01,0)) +
   scale_x_continuous(limits = c(params$low_confidence, 100)) +
-  scale_color_manual(values = palette_singleton_p)+ 
+  scale_color_manual(values = palette_singleton_p) +   
+  labs(x="Mean target pLDDT") + 
   theme(legend.position = "none", 
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank())
@@ -320,18 +325,27 @@ df_multi <- df_filtered %>%
          Jaccard_Pfam=n_Pfam_common/pmax(n_Pfam_domains.x,n_Pfam_domains.y)) %>% 
   select(query, target, singleton, contains("Jaccard"), contains("common"))
 
+
 CATH_plot <- df_multi %>% 
     pivot_longer(contains("Jaccard"), values_to = "Jaccard") %>% 
     mutate(name=gsub("Jaccard_", "", name),
-           name=gsub("3d", "CATH", name)) %>% 
-    ggplot(aes(Jaccard, fill=singleton)) +
-    geom_histogram(binwidth = 0.1, position = "dodge") +
-    facet_grid(name~.) +
-    scale_x_continuous(breaks = seq(0,1,0.1)) +
-    scale_y_continuous(expand = expansion(0,0)) + 
-    scale_fill_manual(values=palette_singleton_p) + 
-  theme(legend.position = "bottom")
-
+           name=gsub("3d", "CATH", name),
+           Jaccard=cut_width(Jaccard, .1, boundary = 0)) %>% 
+  filter(!is.na(Jaccard)) %>% 
+  group_by(name, singleton, Jaccard) %>% 
+  summarise(n=n()) %>% 
+  mutate(freq=n/sum(n)) %>%
+  ggplot(aes(Jaccard, freq, fill=singleton)) + 
+  geom_bar(stat = "identity",position = "dodge") + 
+  facet_grid(name~.) +
+  labs(y="% in group") +
+  scale_y_continuous(expand = expansion(0.01,0)) + 
+  scale_fill_manual(values=palette_singleton_p) +
+  theme(legend.position = "bottom",
+        panel.background = element_rect(fill=NA, color="black"),
+        axis.line = element_blank(),
+        axis.text.x = element_text(size=8))
+  
 # prop_p <- group_by(df_filtered) %>% 
 #   count(query, singleton) %>% 
 #   group_by(query) %>% 
@@ -344,9 +358,11 @@ CATH_plot <- df_multi %>%
 
 fig2_first_row <- (pident_p | eval_p | qcov_p)
 fig2_second_row <- ((lddt_p / alntmscore_p / plddt_p) | CATH_plot) + plot_layout(widths = c(1,2))
-fig2 <-  (fig2_first_row / fig2_second_row)
+fig2 <-  (fig2_first_row / fig2_second_row) +
+  plot_annotation(tag_levels = 'A') & 
+  theme(plot.tag = element_text(size = 10, face = "bold", family = "Helvetica"))
 
-ggsave("draft/figures/fig2.pdf", fig2, width = 9, height = 6)
+ggsave("draft/figures/fig2.pdf", fig2, width = 10.5, height = 8)
 ```
 
 ## Fig3
@@ -413,16 +429,17 @@ scores <- read_delim(glue(outdir,"/reco/", params_dataset$seed, "_scores.tsv"),
 ```{r fig3}
 my_comparisons <- list( c("LG", "3Di"), c("3Di", "GTR"), c("LG", "GTR") )
 plot_bs <- df_bs %>% 
+  mutate(targets=target) %>% 
   # group_by(gene, target, model) %>% 
   # summarise(mn_bs=mean(support)) %>% 
-  ggplot(aes(model, support, fill=target)) +
+  ggplot(aes(model, support, fill=targets)) +
   # geom_violin(position = position_dodge(width = 1)) +
-  geom_boxplot() +
+  geom_boxplot(outlier.size = .1) +
   # ggdist::stat_pointinterval(position = position_dodge(width = 1), color="black") +
   scale_fill_manual(values = palettes_method) +
   theme_classic() +
-  labs(y="Boostrap", x="") +
-  theme(legend.position = "none") 
+  labs(y="Boostrap", x="") 
+  # theme(legend.position = "bottom") 
   # ggpubr::stat_compare_means(aes(group = model),
   #                            comparisons = my_comparisons,
   #                            label = "p.format")
@@ -437,7 +454,7 @@ rf_plot <- rf_df %>%
   scale_fill_distiller(palette="YlGnBu", direction = -1, limits = c(0,1), 
                        name="Median RF") + 
   scale_x_continuous(breaks = c(0,.25,.5, .75,1), labels = function(x) sprintf("%.2g", x)) +
-  coord_fixed(xlim = c(0,1), expand=0) +
+  coord_cartesian(xlim = c(0,1), expand=0) +
   # facet_grid(method~method2, switch = "both") +
   facet_grid(model.x~model.y) +
   # ggh4x::facet_nested(targets+model~targets2+model2, nest_line = element_line(linetype = 1)) +
@@ -454,7 +471,9 @@ rf_plot <- rf_df %>%
         axis.text.y = element_blank(),
         axis.line.y = element_blank(),
         axis.ticks.y = element_blank(),
-        axis.title.y = element_blank())
+        axis.title.y = element_blank(),
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-20,0,0,0))
 
 comps <- NULL
 idx <- 1
@@ -492,26 +511,35 @@ ggplot(scores,aes(n_tips, dups+losses, color=targets)) +
 plot_DL <- scores %>% 
   filter(model!="FTPY") %>% 
   ggplot(aes(model, n_events, fill=targets)) +
-  geom_boxplot() +
+  geom_boxplot(outlier.size = .1) +
   labs(x="", y="(D+L)/# Tips") +
   # ggthemes::scale_fill_solarized() +
-  scale_fill_manual(values = palettes_method) +
-  theme(legend.position = "none")
+  scale_fill_manual(values = palettes_method)
+  # theme(legend.position = "bottom")
 
 var_r2t <- scores %>% 
   filter(model!="FTPY", targets=="common") %>% 
   ggplot(aes(color=model, variance_r2t)) + 
   geom_density(size=1, alpha=.5) +
   # geom_histogram(position = "dodge") + 
-  coord_cartesian(expand = 0) +
+  # coord_cartesian(expand = 0) +
   scale_x_continuous(limits = c(0,.2)) + 
   # facet_grid(~targets) + 
   labs(x="Variance Root-to-tip") +
   scale_color_manual(values = palettes_model) +
-  theme(legend.position = "bottom")
+  theme(legend.position = 'bottom',
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-10,0,0,0))
 
+secondcolumn <- (plot_DL + plot_bs + 
+    plot_layout(guides = "collect", widths = c(5,3)) &
+    theme(legend.position = 'bottom',
+          legend.margin=margin(0,0,0,0),
+          legend.box.margin=margin(-20,0,0,0))) / var_r2t
 
-fig3 <- rf_plot | ((plot_bs | plot_DL) / var_r2t)
+fig3 <- (rf_plot | secondcolumn) +
+  plot_annotation(tag_levels = 'A') & 
+  theme(plot.tag = element_text(size = 10, face = "bold", family = "Helvetica"))
 ggsave("draft/figures/fig3.pdf", fig3, width = 11, height = 6)
 ```
 
@@ -605,17 +633,88 @@ pp1_plot <- nodes_df %>%
   theme_bw()
 
 
+nodes_df %>% 
+  ggplot(aes(label_int, f1+f2+f3, fill=model)) + 
+  geom_bar(stat="identity", position = "dodge") +
+  facet_grid(targets~.) +
+  scale_fill_manual(values=palettes_model)
+
+
 sptree_plot <- ggtree(labeled_sptree) + 
   geom_tiplab() + 
   geom_nodelab(color="firebrick", 
-               nudge_x = -.1, hjust = 1, 
-               nudge_y = .2, size=2)+
+               nudge_x = -.15, hjust = 1, 
+               nudge_y = .3, size=2)+
   scale_x_continuous(expand = c(.2,.2))
   
-fig_s1 <- (plot_dist + sptree_plot + pp1_plot) + plot_layout(widths = c(1.4, 1, 1.6))
 
+plot_ntips <- scores %>% 
+  filter(model!="FTPY") %>% 
+  ggplot(aes(n_tips, dups+losses, color=targets)) + 
+  geom_point(size=.2) +
+  geom_smooth(method = "lm") +
+  facet_grid(~model) + 
+  scale_color_manual(values = palettes_method) +
+  theme_classic() + 
+  theme(panel.border = element_rect(fill=NA),
+        legend.position = "bottom")
+
+fig_s1 <- (plot_dist + sptree_plot + pp1_plot) +
+  plot_layout(widths = c(1.4, 1, 1.6)) + 
+  plot_annotation(tag_levels = 'A') & 
+  theme(plot.tag = element_text(size = 10, face = "bold", family = "Helvetica"))
 ggsave("draft/figures/figS1.pdf", fig_s1, width = 14, height = 6)
+
+# fig_s1 <- (plot_ntips / ((plot_dist + sptree_plot + pp1_plot) +
+#                            plot_layout(widths = c(1.4, 1, 1.6)))) + 
+#   plot_layout(heights = c(.75,1)) 
+# ggsave("draft/figures/figS1.pdf", fig_s1, width = 14, height = 8)
 ```
 
+## Answers to Edu's comments
 
+```{r}
+df %>% 
+  filter(query %in% seeds) %>% 
+  count(query, singleton) %>% 
+  ggplot(aes(n, singleton, fill=singleton)) +
+  geom_boxplot()
+   
+
+blast_filtered_eval <- filter(blast, 
+                         query %in% paste0("AF-", aln_seeds, "-F1"),
+                         evalue<as.numeric(params$eval_both)) %>% 
+  group_by(query) %>% 
+  slice_head(n = params$max_seqs) %>% 
+  ungroup()
+
+fs_filtered_eval <- filter(fs, 
+                      query %in% paste0("AF-", aln_seeds, "-F1"),
+                      evalue<as.numeric(params$eval_both)) %>% 
+  group_by(query) %>% 
+  slice_head(n = params$max_seqs) %>% 
+  ungroup()
+
+df_filtered_eval <- full_join(blast_filtered_eval, fs_filtered_eval,
+                by = c("query", "target"), suffix=c("_Blast", "_Foldseek")) %>%
+    filter(query!=target) %>% 
+  left_join(self, by="query") %>%
+  mutate(pident_Foldseek = 100*pident_Foldseek, 
+         qcov_Foldseek = 100*qcov_Foldseek,
+         singleton = case_when(is.na(evalue_Foldseek) ~ "only Blast",
+                               is.na(evalue_Blast) ~ "only Foldseek", 
+                               .default = "Common"))
+
+select(df_filtered_eval, query, target, singleton) %>% 
+  mutate(method="only-eval") %>% 
+  rbind(select(df_filtered, query, target, singleton) %>% 
+          mutate(method="qcov-tcov")) %>% 
+  group_by(method, singleton) %>% 
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n))
+
+res %>% 
+  group_by(singleton, model) %>% 
+  summarise(median(nn_dist/max_dist))
+```
 

@@ -6,4 +6,4 @@ cd build
 cmake -DUserInstallOption=ON ../
 make install
 
-cp -r build/lib/pdbx/ $CONDA_PREFIX/lib/python*/
+cp -r build/lib/pdbx/ $CONDA_PREFIX/lib/python3.10/
