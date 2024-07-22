@@ -152,6 +152,34 @@ brhs <- rbind(blast_brhs, fs_brhs) %>%
     pivot_wider(names_from = method, values_fill = 0, values_from = n) %>%
     mutate(common = ifelse(fs_brh+blast_brh==2, 1, 0))
 
+
+blast_filt <- filter(blast, 
+                         # query %in% paste0("AF-", aln_seeds, "-F1"),
+                         length/qlen*100>params$coverage, 
+                         length/slen*100>params$coverage,
+                         evalue<as.numeric(params$eval_both)) %>% 
+  group_by(query) %>% 
+  slice_head(n = params$max_seqs) %>% 
+  ungroup()
+
+fs_filt <- filter(fs, 
+                      # query %in% paste0("AF-", aln_seeds, "-F1"),
+                      qcov*100>params$coverage, 
+                      tcov*100>params$coverage, 
+                      evalue<as.numeric(params$eval_both)) %>% 
+  group_by(query) %>% 
+  slice_head(n = params$max_seqs) %>% 
+  ungroup()
+
+df_filt <- full_join(blast_filt, fs_filt,
+                by = c("query", "target"), suffix=c("_Blast", "_Foldseek")) %>%
+    filter(query!=target) %>% 
+  left_join(self, by="query") %>%
+  mutate(pident_Foldseek = 100*pident_Foldseek, 
+         qcov_Foldseek = 100*qcov_Foldseek,
+         singleton = case_when(is.na(evalue_Foldseek) ~ "only Blast",
+                               is.na(evalue_Blast) ~ "only Foldseek", 
+                               .default = "Common"))
 # grouped_brhs <- brhs %>%
 #   group_by(query) %>%
 #   summarise(fs_brh = sum(fs_brh), blast_brh=sum(blast_brh), common_brh=sum(common))
@@ -224,6 +252,81 @@ long_CATH_nms <- long_CATH_df %>%
     distinct()
 ```
 
+## Fig1
+
+```{r fig1}
+
+
+fig1a <- df %>%
+  group_by(singleton) %>%
+  summarise(n = n()) %>%
+  ungroup() %>%
+  mutate(prop=n/sum(n), Filtering="Before") %>%
+  bind_rows(df_filt %>%
+            group_by(singleton) %>%
+            summarise(n = n()) %>%
+            ungroup() %>%
+            mutate(prop=n/sum(n), Filtering="After")) %>%
+  mutate(Filtering=factor(Filtering, labels = c("After", "Before"), ordered = T),
+         singleton=case_when(singleton=="only Blast"~"Only Bp", 
+                             singleton=="only Foldseek" ~ "Only Fs",
+                             .default = singleton)) %>%
+  ggplot(aes(singleton, n, fill=singleton)) +
+  geom_bar(aes(alpha=Filtering), stat = "identity", position = position_dodge2(reverse=TRUE)) +
+  geom_text(aes(group=Filtering, label=paste0(round(prop, 2)*100, "%")),
+            position = position_dodge2(reverse = TRUE, width = 0.9),
+            vjust=1.3, color="white", size=3) +
+  scale_fill_manual(values = palette_singleton_s, guide="none") +
+  scale_alpha_manual(values = c(1,.6)) +
+  scale_y_continuous(expand = c(0,0), labels = scales::label_number(scale = 1e-6)) +
+  labs(fill="Class", x="Class", y="# aligned protein pairs (Mln)") +
+  theme(legend.position = "bottom", legend.box="vertical")
+
+fig1b <- lddt_df %>% 
+  ggplot(aes(mean_lddt)) + 
+  geom_density(fill="#BF4375", size=1) +
+  scale_y_continuous(expand = expansion(mult = c(0, .1))) +
+  labs(x="Mean pLDDT", y="") +
+  geom_vline(xintercept = 40, linetype=2) +
+  theme(axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.line.y = element_blank())
+fig1c <- tibble(seeds) %>% 
+  mutate(`Has > 4 common` = seeds %in% paste0("AF-",aln_seeds,"-F1")) %>% 
+  ggplot(aes(fill=`Has > 4 common`, y=1)) + 
+  geom_bar() +
+  coord_cartesian(expand = 0) +
+  scale_fill_manual(values = c("grey80", "black")) +
+  labs(x="Has > 4 Common hits") +
+  theme(legend.position = "none", 
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.line.y = element_blank())
+
+sps <- read_delim("data/input/Hsapopi_set_sp.txt")
+
+sptree_plot <- fortify(sptree) %>% 
+  left_join(sps, by=c("label"="mnemo")) %>% 
+  mutate(species=gsub("[^A-Z].+? ", ". ", species)) %>% 
+  ggtree() +
+  geom_tiplab(aes(label=species), nudge_x=.2, fontface="italic") + 
+  geom_nodelab(color="firebrick", 
+               nudge_x = -.15, hjust = 1, 
+               nudge_y = .3, size=2.5)+
+  scale_x_continuous(expand = expansion(mult = c(0.2, .7)))
+
+ggsave("draft/figures/Fig1/tree.pdf", sptree_plot, width = 4, height = 4)
+
+fig1 <- (fig1b | (fig1c/fig1d + plot_layout(heights = c(10,1)))) +
+#   plot_layout(widths = c(1,2)) + 
+#   plot_annotation(tag_levels = 'A') & 
+#   theme(plot.tag = element_text(size = 10, face = "bold", family = "Helvetica"))
+ggsave("draft/figures/Fig1/fig1a.pdf", fig1a, width = 3, height = 4)
+ggsave("draft/figures/Fig1/fig1b.pdf", fig1b, width = 4, height = 2)
+ggsave("draft/figures/Fig1/fig1c.pdf", fig1c, width = 4, height = 1)
+
+```
 
 ## Fig2
 
@@ -519,14 +622,17 @@ plot_DL <- scores %>%
 
 var_r2t <- scores %>% 
   filter(model!="FTPY", targets=="common") %>% 
-  ggplot(aes(color=model, variance_r2t)) + 
-  geom_density(size=1, alpha=.5) +
-  # geom_histogram(position = "dodge") + 
+  ggplot(aes(fill=model, variance_r2t)) + 
+  # geom_density(size=1, alpha=.5) +
+  geom_histogram(position = "dodge") +
+    # geom_histogram(position = "dodge") + 
   # coord_cartesian(expand = 0) +
-  scale_x_continuous(limits = c(0,.2)) + 
-  # facet_grid(~targets) + 
+  scale_x_continuous(limits = c(0,.2), expand = expansion(mult=0)) + 
+  scale_y_continuous(expand = expansion(mult=0),
+                     breaks = c(0,100,200)) +
+  # facet_grid(model~.) +
   labs(x="Variance Root-to-tip") +
-  scale_color_manual(values = palettes_model) +
+  scale_fill_manual(values = palettes_model) +
   theme(legend.position = 'bottom',
         legend.margin=margin(0,0,0,0),
         legend.box.margin=margin(-10,0,0,0))

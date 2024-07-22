@@ -27,6 +27,9 @@ names(palette_singleton) <- c("common", "only_blast", "only_fs", "union")
 palette_singleton_p <- c("#00A08A", "#d63a3a", "#ffaa0e", "#6f63bb")
 names(palette_singleton_p) <- c("Common", "only Blast", "only Foldseek", "Union")
 
+palette_singleton_s <- c("#00A08A", "#d63a3a", "#ffaa0e", "#6f63bb")
+names(palette_singleton_s) <- c("Common", "Only Bp", "Only Fs", "Union")
+
 palette_brh <- c("#00A08A","#d63a3a", "#ffaa0e")
 names(palette_brh) <- c("common","blast_brh", "fs_brh")
 

@@ -1,0 +1,19 @@
+Proteome_ID	Tax_ID	mnemo	species
+UP000005640	9606	Hsap	Homo sapiens
+UP000001038	8090	Olat	Oryzias latipes
+UP000515135	7741	Bbel	Branchiostoma belcheri
+UP000007110	7668	Spur	Strongylocentrotus purpuratus
+UP000014760	283909	Ctel	Capitella teleta
+UP000000305	6669	Dpul	Daphnia pulex
+UP000594262	252671	Chem	Clytia hemisphaerica
+UP000001593	45351	Nvec	Nematostella vectensis
+UP000009022	10228	Tadh	Trichoplax adhaerens
+UP000007879	400682	Aque	Amphimedon queenslandica
+UP000001357	81824	Mbre	Monosiga brevicollis
+UP000008743	595528	Cowc	Capsaspora owczarzaki
+UP000054560	667725	Sarc	Sphaeroforma arctica
+UP000001805	367110	Ncra	Neurospora crassa
+UP000000561	237631	Umay	Ustilago maydis
+UP000053201	645134	Spun	Spizellomyces punctatus
+UP000002195	44689	Ddis	Dictyostelium discoideum
+UP000006548	3702	Atha	Arabidopsis thaliana

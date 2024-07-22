@@ -1,0 +1,10 @@
+# Input file
+dataset: 'no_cov'
+taxids: 'data/input/Hsapopi_set.txt'
+species_tree: 'data/sptrees/homo_internal.spTree.nw'
+seed: ['UP000005640']
+root: 'Atha'
+
+# this is the number of seed genes to run the pipeline
+test_seeds: 200
+coverage: 0
