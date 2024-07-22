@@ -36,8 +36,8 @@ plots = ["homology", "saturation", "runtime", "astral_pro", "trees", "discordanc
 
 rule all:
     input:
-        expand(outdir+"/homology/{seed}_blast_brh.tsv", seed=config['seed']),
-        expand(outdir+"/homology/{seed}_fs_brh.tsv", seed=config['seed']),
+        # expand(outdir+"/homology/{seed}_blast_brh.tsv", seed=config['seed']),
+        # expand(outdir+"/homology/{seed}_fs_brh.tsv", seed=config['seed']),
         outdir+'/db/db_num.tsv',
         expand(outdir+"/plots/{seed}_{plot}.pdf", seed=config['seed'], plot=plots),
         expand(outdir+"/plots/{seed}_foldmason", seed=config['seed']),

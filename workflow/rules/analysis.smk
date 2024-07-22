@@ -61,8 +61,8 @@ def seeds_examples(wildcards):
     checkpoint_output = checkpoints.get_examples_ids.get(**wildcards).output[0]
     with open(checkpoint_output) as all_genes:
         seed_genes = [gn.strip() for gn in all_genes]
-    outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_union_3Di.html", 
-                      seed=wildcards.seed, i=seed_genes)
+    outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_{mode}_3Di.html", 
+                      seed=wildcards.seed, i=seed_genes, mode=config["foldmason_set"])
     return outfiles
 
 rule get_examples_report:

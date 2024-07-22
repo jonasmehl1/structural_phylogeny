@@ -49,11 +49,11 @@ rm -f ${{tree_prefix}}.model.gz ${{tree_prefix}}.splits.nex ${{tree_prefix}}.con
 
 rule foldmason:
     input: 
-        fa=outdir+"/seeds/{seed}/{i}/{i}_union_3Di.alg",
+        fa=outdir+"/seeds/{seed}/{i}/{i}_{mode}_3Di.alg",
         db=rules.make_foldseekdb.output
     output: 
-        fa=temp(outdir+"/seeds/{seed}/{i}/{i}_union_3Di.alg.tmp"),
-        html=outdir+"/seeds/{seed}/{i}/{i}_union_3Di.html"
+        fa=temp(outdir+"/seeds/{seed}/{i}/{i}_{mode}_3Di.alg.tmp"),
+        html=outdir+"/seeds/{seed}/{i}/{i}_{mode}_3Di.html"
     conda: "../envs/sp_utils.yaml"
     shell: '''
 cat <(seqkit grep -p "AF-{wildcards.i}-F1" {input.fa}) <(seqkit grep -v -p "AF-{wildcards.i}-F1" {input.fa}) |\

@@ -1,11 +1,15 @@
 # Input file
 dataset: 'small'
-input_table_file: 'data/input_tables/Hsapopi.csv'
-species_tree: 'data/sptrees/homo.spTree.nw'
-species_tree_labels: 'data/sptrees/homo_internal.spTree.nw'
-taxons_file: 'data/meta/Hsap_taxon.csv'
+taxids: 'data/input/Hsapopi_set.txt'
+species_tree: 'data/sptrees/homo_internal.spTree.nw'
 seed: ['UP000005640']
 root: 'Atha'
+
+combinations: ["3Di_3Di", "aa_LG"]
+combinations_ML: ["3Di_3Di", "aa_LG"]
+#, "3Di_FTPY"]
+modes: ['blast']
+foldmason_set: 'blast'
 
 # this is the number of seed genes to run the pipeline
 test_seeds: 5

@@ -33,7 +33,7 @@ rule make_foldseekdb_seq:
     shell:'''
 foldseek lndb {input}_h {input}_ss_h
 foldseek convert2fasta {input}_ss {output}
-sed -i 's/-model_v4.cif//g' {output}
+sed -i 's/-model_v4.cif.gz//g' {output}
 '''
 
 rule make_foldseekdb_single:
@@ -59,7 +59,7 @@ rule foldseek:
     shell:'''
 foldseek easy-search {input.q} {input.db} {output} $TMPDIR/{wildcards.seed} --threads {threads} --max-seqs {params} \
 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > {log}
-sed -i 's/-model_v4.cif//g' {output}
+sed -i 's/-model_v4.cif.gz//g' {output}
 '''
 
 
@@ -79,12 +79,12 @@ rule foldseek_allvall:
 foldseek easy-search {input.q} {input.t} {output.q_t} $TMPDIR/{wildcards.seed}_{wildcards.code} \
 --threads {threads} --max-seqs {params} \
 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > {log}
-sed -i 's/-model_v4.cif//g' {output.q_t}
+sed -i 's/-model_v4.cif.gz//g' {output.q_t}
 
 foldseek easy-search {input.t} {input.q} {output.t_q} $TMPDIR/{wildcards.code}_{wildcards.seed} \
 --threads {threads} --max-seqs {params} \
 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > {log}
-sed -i 's/-model_v4.cif//g' {output.t_q}
+sed -i 's/-model_v4.cif.gz//g' {output.t_q}
 '''
 
 rule foldseek_brh:

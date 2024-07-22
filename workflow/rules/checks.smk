@@ -80,15 +80,16 @@ checkpoint check_orphans:
     input: seeds_homology
     output:
         exclude=outdir+"/ids/{seed}_orphans.exclude",
-        continue_aln=outdir+"/ids/{seed}_aln.ids",
+        continue_aln=outdir+"/ids/{seed}_aln.ids"
+    params: min_common=config["min_common"]
     shell:'''
 > {output.exclude}
 > {output.continue_aln}
 
 for file in {input}; do
     n_hits=$(wc -l < $file)
-    if [ $n_hits -lt 4 ]; then
-        echo -e "$(basename $file | cut -f1 -d'_')\\tless than 4 common hits" >> {output.exclude}
+    if [ $n_hits -lt {params.min_common} ]; then
+        echo -e "$(basename $file | cut -f1 -d'_')\\tless than {params.min_common} common hits" >> {output.exclude}
     else
         echo "$(basename $file | cut -f1 -d'_')" >> {output.continue_aln}
     fi
@@ -207,10 +208,11 @@ rule blast_trees:
 
 rule get_unrooted_trees:
     input: 
-        rules.common_trees.output,
-        rules.union_trees.output,
-        rules.fs_trees.output,
-        rules.blast_trees.output
+        expand(outdir+"/trees/{{seed}}_{mode}_trees.txt", mode=config["modes"])
+        # rules.common_trees.output,
+        # rules.union_trees.output,
+        # rules.fs_trees.output,
+        # rules.blast_trees.output
     output:
         trees=outdir+"/trees/{seed}_unrooted_trees.txt"
     shell:'''
