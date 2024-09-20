@@ -34,8 +34,9 @@ gff <- read_delim(c(snakemake@input[["gff"]]),
                   show_col_types = FALSE) %>% 
   filter(type %in% c(interesting_types, "Chain"))
 
-reco <- read_delim(snakemake@input[["reco"]], show_col_types = FALSE) %>% 
-  mutate(model=factor(model, levels=models))
+reco <- read_delim(snakemake@input[["reco"]], 
+                   show_col_types = FALSE, col_names = c("gene", "dups", "losses")) %>% 
+  separate(gene, c("id", "targets", "alphabet", "model")) 
 
 plot_list = list()
 plot_domains = list()
@@ -144,7 +145,8 @@ for (seed in seeds) {
     theme_void() + 
     theme(axis.text.x = element_text())
 
-  trees_files <- fls[grepl("nwk$", fls)]
+  trees_files <- fls[grepl(".nwk$", fls)]
+  trees_files <- trees_files[!grepl("_rnm.nwk$", trees_files)]
 
   trees <- read.tree(text = sapply(trees_files, readLines))
   names(trees) <- gsub(paste0(seed,"_|(3Di|aa)_|.nwk$"), "", basename(trees_files))
@@ -168,9 +170,9 @@ for (seed in seeds) {
 
   a <- plot_dom(trees[["union_LG"]], seed, gff, prot, singleton_df, "LG")
   b <- plot_dom(trees[["union_FT"]], seed, gff, prot, singleton_df, "FT")
-  plot_tree_domain <- (a[[2]] | a[[1]]) | (b[[2]] | b[[1]])
+  plot_tree_domain <- (a[[2]] + a[[1]] + b[[2]] + b[[1]]) + plot_layout(nrow = 1)
 
-  plot_ranger <- reco %>% 
+  plot_notung <- reco %>% 
     filter(id==seed) %>% 
     left_join(singleton_df_red) %>% 
     ggplot(aes(targets, (dups+losses)/n, color=model)) + 
@@ -205,7 +207,7 @@ for (seed in seeds) {
   title <- ifelse(is.null(title), seed, paste(seed, "-", title))
 
   first_row <- (plot_seed | plot_venn) + plot_layout(widths = c(4.5,1))
-  bottom_row <- ((plot_conf / plot_ranger) | tree_plot) + plot_layout(widths = c(1, 5))
+  bottom_row <- ((plot_conf / plot_notung) | tree_plot) + plot_layout(widths = c(1, 5))
   outplot <- (first_row / plot_3di_aln / plot_aa_aln / bottom_row) + 
     plot_layout(heights = c(.5,1,1,2)) +
     plot_annotation(title = title, subtitle = subtitle, tag_levels = "A")

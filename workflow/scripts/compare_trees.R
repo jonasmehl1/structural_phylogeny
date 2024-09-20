@@ -23,7 +23,18 @@ df_ml <- read_delim(snakemake@input[["mltrees"]], delim = "\t",
 ts <- read.tree(text = df_trees$tree)
 names(ts) <- paste(df_trees$gene, df_trees$target, df_trees$alphabet, df_trees$model, sep = "_")
 
-# # get BS distribution
+var_df <- sapply(ts, function(x) 
+  var(adephylo::distRoot(phytools::midpoint_root(x)))) %>% 
+  enframe() %>%
+  separate(name, c("gene", "target", "alphabet", "model")) %>%
+  rename("variance_r2t"="value")
+
+n_tips <- sapply(ts, function(x) length(x$tip.label)) %>% 
+  enframe() %>%
+  separate(name, c("gene", "target", "alphabet", "model")) %>%
+  rename("n_tips"="value")
+
+# get BS distribution
 df_bs <- fortify(ts) %>%
   filter(!isTip) %>%
   mutate(support=as.numeric(label)) %>%
@@ -90,7 +101,9 @@ rf_df <- filter(df_trees, target=="common") %>%
   inner_join(x=., y = ., by = c("gene", "target")) %>%
   filter(!is.na(tree.x), !is.na(tree.y)) %>%
   rowwise() %>%
-  mutate(RF = phangorn::RF.dist(normalize = TRUE, read.tree(text = tree.x), read.tree(text=tree.y)),
+  mutate(RF = phangorn::RF.dist(normalize = TRUE, check.labels = FALSE,
+                                read.tree(text = tree.x),
+                                read.tree(text=tree.y)),
          n_tips = length(read.tree(text = tree.x)$tip.label)) %>%
   select(-tree.x, -tree.y)
 
@@ -98,7 +111,7 @@ rf_text <- group_by(rf_df, model.x, model.y) %>%
   filter(as.integer(model.x)<=as.integer(model.y)) %>% 
   summarise(value=median(RF, na.rm=T))
 
-# plto the heatmap of dist distribution and median value
+# plot the heatmap of dist distribution and median value
 rf_plot <- rf_df %>% 
   ggplot(aes(RF)) +
   geom_tile(aes(x=0.5, y=0.5, fill=value), data = rf_text) +
@@ -127,15 +140,20 @@ rf_plot <- rf_df %>%
         axis.title.y = element_blank())
 
 
-# Reconciliation ranger+TCS scores
-reco <- read_delim(snakemake@input[["reco"]], show_col_types = FALSE) 
+# Reconciliation notung
+reco <- read_delim(snakemake@input[["reco"]], 
+                     show_col_types = FALSE, col_names = c("gene", "dups", "losses")) %>% 
+  separate(gene, c("gene", "targets", "alphabet", "model")) %>% 
+  left_join(var_df) %>% 
+  left_join(n_tips) %>% 
+  mutate(model=factor(model, levels=models),
+         n_events = (dups+losses)/n_tips)
 
-scores <- read_delim(snakemake@input[["scores"]], show_col_types = FALSE) %>% 
-  left_join(reco) %>% 
-  mutate(model=factor(model, levels=models))
+# scores <- read_delim(snakemake@input[["scores"]], show_col_types = FALSE) %>% 
+#   left_join(reco) %>% 
 
 # Ranger results
-ranger_plot <- mutate(scores, n_events = (dups+losses)/n_tips) %>% 
+notung_plot <- reco %>%  
   ggplot(aes(model, n_events, fill=targets)) + 
   geom_boxplot() +
   scale_fill_manual(values = palettes_method) +
@@ -143,27 +161,27 @@ ranger_plot <- mutate(scores, n_events = (dups+losses)/n_tips) %>%
   guides(fill = guide_legend(nrow = 3)) + 
   theme(legend.position = "none")
 
-TCS_df <- scores %>% 
-  select(id, targets, model, score)
+# TCS_df <- scores %>% 
+#   select(id, targets, model, score)
   # pivot_wider(names_from = model, values_from = score)
 
-plot_tcs <- inner_join(TCS_df, TCS_df, by = c("id", "targets"), 
-                       multiple = "all", relationship = "many-to-many") %>% 
-  filter(as.integer(model.x)>as.integer(model.y)) %>% 
-  ggplot(aes(score.x, score.y, color=targets)) +
-  geom_point(alpha=.4, size=1) + 
-  geom_abline() +
-  ggh4x::facet_grid2(model.x~model.y, render_empty = F, 
-                     strip = ggh4x::strip_vanilla()) + 
-  scale_color_manual(values = palettes_method) +
-  labs(x="TCS Score", y="") +
-  coord_fixed() +
-  theme_bw() + 
-  theme(legend.position = "none",
-        axis.text.x = element_text(angle = 90))
+# plot_tcs <- inner_join(TCS_df, TCS_df, by = c("id", "targets"), 
+#                        multiple = "all", relationship = "many-to-many") %>% 
+#   filter(as.integer(model.x)>as.integer(model.y)) %>% 
+#   ggplot(aes(score.x, score.y, color=targets)) +
+#   geom_point(alpha=.4, size=1) + 
+#   geom_abline() +
+#   ggh4x::facet_grid2(model.x~model.y, render_empty = F, 
+#                      strip = ggh4x::strip_vanilla()) + 
+#   scale_color_manual(values = palettes_method) +
+#   labs(x="TCS Score", y="") +
+#   coord_fixed() +
+#   theme_bw() + 
+#   theme(legend.position = "none",
+#         axis.text.x = element_text(angle = 90))
 
 
-plot_varr2t <- scores %>% 
+plot_varr2t <- reco %>% 
   # filter(model %in% c("3Di", "LG", "GTR")) %>% 
   ggplot(aes(variance_r2t, color=model)) +
   geom_density() + 
@@ -172,11 +190,11 @@ plot_varr2t <- scores %>%
   scale_color_manual(values = palettes_model) +
   theme(legend.position = 'bottom')
 
-reco <- ((plot_bs/ranger_plot)|plot_tcs) + plot_layout(widths = c(1,2.5))
+reco_plot <- (plot_bs|notung_plot)
 
 model <- plot_3di/(plot_rate|rf_plot)/plot_varr2t + 
   plot_layout(heights = c(1,4,1))
 
-ggsave(snakemake@output[["reco"]], reco, width = 10, height = 8)
+ggsave(snakemake@output[["reco"]], reco_plot, width = 10, height = 8)
 ggsave(snakemake@output[["model"]], model, width = 15, height = 12)
 

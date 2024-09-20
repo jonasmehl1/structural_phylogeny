@@ -39,6 +39,11 @@ rule all:
         # expand(outdir+"/homology/{seed}_blast_brh.tsv", seed=config['seed']),
         # expand(outdir+"/homology/{seed}_fs_brh.tsv", seed=config['seed']),
         outdir+'/db/db_num.tsv',
+        expand(outdir+"/reco/disco/{seed}_{mode}_{comb}_disco_output.nwk", 
+            seed=config["seed"], mode=config["modes"], comb=config["combinations"]),
         expand(outdir+"/plots/{seed}_{plot}.pdf", seed=config['seed'], plot=plots),
         expand(outdir+"/plots/{seed}_foldmason", seed=config['seed']),
-        expand(config['data_dir']+'cath/{code}_cath.tsv', code=codes)
+        expand(outdir+"/reco/{seed}_notung.tsv", seed=config['seed']),
+        expand(config['data_dir']+'cath/{code}_cath.tsv', code=codes),
+        expand(config['data_dir']+'ids/{code}_ids.tsv', code=codes),
+

@@ -75,7 +75,7 @@ rule plot_examples:
         trees=rules.get_unrooted_trees.output.trees,
         ids=rules.get_examples_ids.output,
         taxidmap=rules.make_blastdb.output.mapid,
-        reco=rules.merge_Ranger.output.DTLs,
+        reco=rules.merge_Notung.output,
         sptree=config['species_tree'],
         table=rules.get_taxon_file.output,
         gff=expand(config['data_dir']+'gffs/{code}.gff', code=codes)
@@ -96,23 +96,23 @@ rule get_lineage:
 cut -f2,3 {input} | taxonkit reformat -I 1 | sed 's/;/,/g' | awk 'NR>1' > {output}
 '''
 
-rule get_verticality:
-    input: 
-        trees=rules.get_unrooted_trees.output.trees,
-        lineage=rules.get_lineage.output,
-        taxidmap=rules.make_blastdb.output.mapid
-        # sptree=config['species_tree']
-    output:
-        # ranger=temp(outdir+"/reco/{seed}_ranger.tsv"),
-        outdir+"/reco/{seed}_scores.tsv"
-    conda: "../envs/sp_python.yaml"
-    script:"../scripts/foldtree/compute_scores.py"
+# rule get_verticality:
+#     input: 
+#         trees=rules.get_unrooted_trees.output.trees,
+#         lineage=rules.get_lineage.output,
+#         taxidmap=rules.make_blastdb.output.mapid
+#         # sptree=config['species_tree']
+#     output:
+#         # ranger=temp(outdir+"/reco/{seed}_ranger.tsv"),
+#         outdir+"/reco/{seed}_scores.tsv"
+#     conda: "../envs/sp_python.yaml"
+#     script:"../scripts/foldtree/compute_scores.py"
 
 
 rule plot_trees:
     input: 
-        scores=rules.get_verticality.output,
-        reco=rules.merge_Ranger.output.DTLs,
+        # scores=rules.get_verticality.output,
+        reco=rules.merge_Notung.output,
         trees=outdir+"/trees/{seed}_unrooted_trees.txt",
         mltrees=outdir+"/trees/{seed}_mltrees.txt"
     output:
@@ -174,18 +174,23 @@ cut -f5 > {output.gt}
 astral-pro -c {input.sptree} -a {input.genemap} -u 2 -i {output.gt} -o {output.st} -C --root {params} 2> {log}
 '''
 
-# rule run_astral_pro:
-#     input:
-#         gt=rules.support_astral_pro.output.gt,
-#         genemap=rules.prepare_astral_pro.output,
-#         trees=rules.get_unrooted_trees.output.trees
-#     output: outdir+"/reco/{seed}_{mode}_{alphabet}_{model}_apro_sptree.nwk"
-#     params: config['root']
-#     log: outdir+"/log/apro/{seed}_{mode}_{alphabet}_{model}_apro.log"
-#     threads: 4
-#     shell:'''
-# astral-pro -t {threads} -a {input.genemap} -u 1 -i {input.gt} -o {output} --root {params} 2> {log}
-# '''
+rule disco:
+    input:
+        # sptree=config['species_tree'],
+        genemap=rules.prepare_astral_pro.output,
+        trees=rules.get_unrooted_trees.output.trees,
+    output: 
+        gt=outdir+"/reco/disco/{seed}_{mode}_{alphabet}_{model}_disco_input.nwk",
+        gt_out=outdir+"/reco/disco/{seed}_{mode}_{alphabet}_{model}_disco_output.nwk"
+    log: outdir+"/log/disco/{seed}_{mode}_{alphabet}_{model}_disco.log"
+    params: config['root']
+    # conda: "../envs/sp_tree.yaml"
+    shell:'''
+awk '$2=="{wildcards.mode}" && $3=="{wildcards.alphabet}" && $4=="{wildcards.model}"' {input.trees} | \
+cut -f5 | nw_rename - {input.genemap} > {output.gt}
+disco.py -i {output.gt} -o {output.gt_out}
+'''
+
 
 rule plot_astral_pro:
     input:

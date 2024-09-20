@@ -75,7 +75,9 @@ rule get_CATH:
 wget "https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cxref_pfam%2Cxref_gene3d&format=tsv&query=%28%28proteome%3A{wildcards.code}%29%29" -O {output}  
 '''
 
-# rule merge_gff:
-#     input: expand(config['gff_dir']+'{code}.gff', code=codes)
-#     output: config['gff_dir']+'all_proteins.gff'
-#     shell: 'cat {input} > {output}'
+rule get_phygeno:
+    output: config['data_dir']+'ids/{code}_ids.tsv'
+    shell: '''
+wget "https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cid%2Cxref_genetree%2Cxref_hogenom%2Cxref_inparanoid%2Cxref_phylomedb%2Cxref_orthodb%2Cxref_oma%2Cxref_treefam%2Cxref_eggnog&format=tsv&query=%28%28proteome%3A{wildcards.code}%29%29" \
+-O {output}  
+'''

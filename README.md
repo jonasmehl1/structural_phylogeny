@@ -18,7 +18,7 @@ The only dependency not automatically managed in the pipeline is gsutil: follow 
 
 ### Data preparation
 
-First of all you need to download the data, to do this you need an input file with 3 columns (Uniprot ID\tTaxid\tmnemonic), see `data/input/Test_set.txt`. You also need a config file where you can specify various parameters, see `config/test.yaml` for example. 
+First of all you need to download the data, to do this you need an input file with 3 columns (Uniprot ID\tTaxid\tmnemonic), see `data/input/Test_set.txt`. You also need a config file where you can specify various parameters, see `config/test.yaml` for example. The analysis in the paper were done using `config/Hsapopi_test.yaml`.
 
 ```yaml
 # Input file
@@ -68,5 +68,10 @@ snakemake --configfile config/test.yaml -p -j2 -k --sdm conda
 
 * `results/{dataset}/trees/{seed}_unrooted_trees.txt`: has 5 columns (gene ID, target set, alphabet, model and tree text). This file is easily parsable in R or Python to do further analyses. You can find some R scripts to do that in `workflow/scripts/` 
 * `results/{dataset}/plots/{seed}*pdf`: here you will find various plot that should inform you about the homology search and tree reconstruction quality.
-* `results/data`: here you will find very useful files for specific downstream analyses including the fastas and a cif file, a prediction file and the PAE file per protein. You will also find a `gffs` folder where uniprot gffs are stored and a `cath` folder where each proteome has a file that connects protein id to Pfam and Gene3D entries.
+* `results/data`: here you will find very useful files for specific downstream analyses including the fastas and a cif file, a prediction file and the PAE file per protein. You will also find a `gffs` folder where uniprot gffs are stored and a `cath` folder where each proteome has a file that connects protein id to Pfam and Gene3D entries. In the `ids` folder you can also see various phylogenomic useful links in case you would like to benchmark with different homology sets as inferred by OMA, EggNOG or PhylomeDB (among others).
 <!-- * `results/{dataset}/homology/{seed}_{method}_brh.tsv`: these files are not used in automatic downstream analyses but may be useful for some further exploration of the results. -->
+
+# TODOs
+
+<!-- * add [notung](http://amberjack.compbio.cs.cmu.edu/Notung/Notung-2.9.1.5.zip) and remove ranger dtl. -->
+* look at [Reseek](https://github.com/rcedgar/reseek) and maybe implement it

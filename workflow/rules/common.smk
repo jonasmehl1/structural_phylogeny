@@ -57,7 +57,7 @@ rule foldmason:
     conda: "../envs/sp_utils.yaml"
     shell: '''
 cat <(seqkit grep -p "AF-{wildcards.i}-F1" {input.fa}) <(seqkit grep -v -p "AF-{wildcards.i}-F1" {input.fa}) |\
-seqkit replace -p $ -r -model_v4.cif > {output.fa}
+seqkit replace -p $ -r -model_v4.cif.gz > {output.fa}
 foldmason msa2lddtreport {input.db} {output.fa} {output.html}
 '''
 
@@ -144,25 +144,39 @@ rule quicktree:
 esl-reformat stockholm {input} | quicktree -boot {params} -in a -out t /dev/stdin | paste -s -d '' > {output} 2> {log}
 '''
 
-rule RangerDTL:
-    input:
-        sptree=config['species_tree'],
-        genetree=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}.nwk",
-        taxidmap=rules.make_taxidmap_sp.output
-    output: 
-        full=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}_ranger.txt"
-    conda: "../envs/sp_tree.yaml"
-    shell:'''
-echo -e "$(cat {input.sptree})\\n$(nw_rename {input.genetree} {input.taxidmap})" | \
-Ranger-DTL.linux -i /dev/stdin -o {output.full} -T 2000 -q
-'''
 
-# rule root_tree:
-#     input: outdir+"/seeds/{seed}/{i}/{i}_{mode}_{algorithm}_{model}.nwk"
-#     output: outdir+"/seeds/{seed}/{i}/{i}_{mode}_{algorithm}_{model}.nwk.rooted"
-#     log: outdir+"/log/mad/{seed}_{i}_{mode}_{algorithm}_{model}.log"
-#     shell: '''
-# mad {input} > {log}
-# sed -i \'2,$d\' {output}
+# rule RangerDTL:
+#     input:
+#         sptree=config['species_tree'],
+#         genetree=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}.nwk",
+#         taxidmap=rules.make_taxidmap_sp.output
+#     output: 
+#         full=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}_ranger.txt"
+#     conda: "../envs/sp_tree.yaml"
+#     shell:'''
+# echo -e "$(cat {input.sptree})\\n$(nw_rename {input.genetree} {input.taxidmap})" | \
+# Ranger-DTL.linux -i /dev/stdin -o {output.full} -T 2000 -q
 # '''
 
+
+rule Notung:
+    input: 
+        genetree=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}.nwk",
+        sptree=config['species_tree'],
+        taxidmap=rules.make_taxidmap_sp.output
+    output: 
+        map_ids=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}.map",
+        genetree=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}_rnm.nwk",
+        reco=outdir+"/reco/notung/{seed}/{i}_{mode}_{alphabet}_{model}_rnm.nwk.rooting.0.parsable.txt"
+    params: 
+        notung=config['Notung']
+    shell: '''
+nw_labels {input.genetree} -I | \
+csvtk join -H -t -f 1 {input.taxidmap} - | \
+awk '{{print $1"\\t"$1"_"$2}}' > {output.map_ids}
+
+nw_rename {input.genetree} {output.map_ids} > {output.genetree}
+
+java -jar {params.notung} --root --maxtrees 1 -g {output.genetree} -s {input.sptree} \
+--speciestag postfix --parsable --outputdir $(dirname {output.reco})
+'''

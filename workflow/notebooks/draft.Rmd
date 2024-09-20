@@ -44,7 +44,8 @@ outdir <- glue(params$outdir, params_dataset$dataset)
 ```{r read_stuff, cache=FALSE}
 seeds <- readLines(glue(outdir, "/ids/UP000005640_common.ids"))
 
-tax <- read_delim(params_dataset$taxons_file, show_col_types=F)
+tax <- read_delim(glue(outdir, "/meta/", params_dataset$dataset, "_uniprot_genomes.tsv"), 
+                  show_col_types=F)
 taxmap <- read_delim(glue(outdir, "/db/taxidmap"), 
                      delim = "\t", col_names = c("label", "Tax_ID"),
                      show_col_types = FALSE) %>% 
@@ -54,7 +55,7 @@ taxmap <- read_delim(glue(outdir, "/db/taxidmap"),
 taxidmap <- read_delim(glue(outdir,"/db/taxidmap"), 
                        col_names = c("target", "Tax_ID"), show_col_types=F)
 
-sptree <- read.tree(params_dataset$species_tree_labels)
+sptree <- read.tree(params_dataset$species_tree)
 translate <- deframe(distinct(dplyr::select(taxmap, Proteome_ID, mnemo)))
 # sptree$tip.label <- names(translate)[match(translate, sptree$tip.label)]
 
@@ -67,18 +68,19 @@ for (sp in sptree$tip.label){
 }
 
 # read input table
-lvls_tax <- rev(c(unique(tax$Clade), "archaea", "bacteria"))
+# lvls_tax <- rev(c(unique(tax$Clade), "archaea", "bacteria"))
 
 table_columns <- c('Proteome_ID', 'Tax_ID', 'count1', 'count2', 'count3', 
                    'genome', 'source', 'species', 'mnemo')
 
-table <- read_delim(params_dataset$input_table_file, show_col_types=F, 
-                    delim = "\t", col_names = table_columns) %>% 
-  left_join(tax, by = "Tax_ID") %>% 
-  mutate(Clade = ifelse(is.na(Clade), mnemo, Clade),
-         Clade = factor(Clade, levels = lvls_tax))
+# table <- read_delim(params_dataset$input_table_file, show_col_types=F, 
+#                     delim = "\t", col_names = table_columns) %>% 
+#   left_join(tax, by = "Tax_ID") %>% 
+#   mutate(Clade = ifelse(is.na(Clade), mnemo, Clade),
+#          Clade = factor(Clade, levels = lvls_tax))
 
-lddt_df <- read_delim(paste0(params$structure_dir, "/", tax$Proteome_ID, "/", tax$Proteome_ID, "_mean_plddt.tsv"),
+lddt_df <- read_delim(paste0(params$data_dir, "structures/", 
+                             tax$Proteome_ID, "/", tax$Proteome_ID, "_mean_plddt.tsv"),
            col_names = c("target", "mean_lddt"), show_col_types = FALSE)
 
 aln_seeds <- readLines(glue(outdir,"/ids/", params_dataset$seed, "_aln.ids"))
@@ -214,7 +216,7 @@ df_filtered <- full_join(blast_filtered, fs_filtered,
 
 
 ```{r cath}
-CATH_df <- read_delim(list.files(params$cath_dir, full.names = TRUE),
+CATH_df <- read_delim(list.files(glue(params$data_dir, "cath"), full.names = TRUE),
                       delim = "\t", id = "proteome", show_col_types = FALSE) %>%
   # filter(!is.na(Gene3D)) %>% 
   mutate(proteome = gsub("_cath.tsv", "", basename(proteome)),
@@ -224,14 +226,14 @@ CATH_df <- read_delim(list.files(params$cath_dir, full.names = TRUE),
   mutate(target=paste0("AF-", Entry, "-F1")) %>% 
     select(-proteome, Entry)
 
-nms <- read_delim("test/cath/cath-names.txt", 
+nms <- read_delim("resources/cath-names.txt", 
                   comment = "#", delim = "    ",
                   col_names = c("Gene3D", "abbr", "name"), 
                   show_col_types = FALSE) %>% 
   select(-abbr) %>% 
   mutate(name=gsub("^:", "", name))
 
-nms_pfam <- read_delim("test/cath/Pfam-A.clans.tsv", 
+nms_pfam <- read_delim("resources/Pfam-A.clans.tsv", 
            col_names = c("Pfam", "clan", "boh", "abbr", "name"), 
            show_col_types = FALSE) %>% 
   select(-name, -clan, -boh)
@@ -255,8 +257,6 @@ long_CATH_nms <- long_CATH_df %>%
 ## Fig1
 
 ```{r fig1}
-
-
 fig1a <- df %>%
   group_by(singleton) %>%
   summarise(n = n()) %>%
@@ -291,55 +291,22 @@ fig1b <- lddt_df %>%
   theme(axis.ticks.y = element_blank(),
         axis.text.y = element_blank(),
         axis.line.y = element_blank())
-fig1c <- tibble(seeds) %>% 
-  mutate(`Has > 4 common` = seeds %in% paste0("AF-",aln_seeds,"-F1")) %>% 
-  ggplot(aes(fill=`Has > 4 common`, y=1)) + 
-  geom_bar() +
-  coord_cartesian(expand = 0) +
-  scale_fill_manual(values = c("grey80", "black")) +
-  labs(x="Has > 4 Common hits") +
-  theme(legend.position = "none", 
-        axis.ticks.y = element_blank(),
-        axis.text.y = element_blank(),
-        axis.title.y = element_blank(),
-        axis.line.y = element_blank())
 
-sps <- read_delim("data/input/Hsapopi_set_sp.txt")
-
-sptree_plot <- fortify(sptree) %>% 
-  left_join(sps, by=c("label"="mnemo")) %>% 
-  mutate(species=gsub("[^A-Z].+? ", ". ", species)) %>% 
-  ggtree() +
-  geom_tiplab(aes(label=species), nudge_x=.2, fontface="italic") + 
-  geom_nodelab(color="firebrick", 
-               nudge_x = -.15, hjust = 1, 
-               nudge_y = .3, size=2.5)+
-  scale_x_continuous(expand = expansion(mult = c(0.2, .7)))
-
-ggsave("draft/figures/Fig1/tree.pdf", sptree_plot, width = 4, height = 4)
-
-fig1 <- (fig1b | (fig1c/fig1d + plot_layout(heights = c(10,1)))) +
-#   plot_layout(widths = c(1,2)) + 
-#   plot_annotation(tag_levels = 'A') & 
-#   theme(plot.tag = element_text(size = 10, face = "bold", family = "Helvetica"))
-ggsave("draft/figures/Fig1/fig1a.pdf", fig1a, width = 3, height = 4)
-ggsave("draft/figures/Fig1/fig1b.pdf", fig1b, width = 4, height = 2)
-ggsave("draft/figures/Fig1/fig1c.pdf", fig1c, width = 4, height = 1)
-
+ggsave("draft/figures/fig1_lddt.pdf", fig1b, width = 3, height = 4)
+ggsave("draft/figures/fig1_cnts.pdf", fig1a, width = 4, height = 2)
 ```
 
 ## Fig2
 
 ```{r fig2}
-evals <- c(Inf, 1e-2, 1e-3, 1e-5)
-min_covs <- c(0, 30, 80)
 eval_p <- ggplot(df, aes(-log10(evalue_Blast), -log10(evalue_Foldseek))) + 
   stat_bin_2d(breaks=seq(0,20,0.4)) + 
   scale_fill_gradientn(colors=wespal) +
-  geom_hline(yintercept = -log10(evals), linetype=2) + 
-  geom_vline(xintercept = -log10(evals), linetype=2) + 
+  ggpubr::stat_cor(label.x.npc = .025) +
+  # geom_hline(yintercept = -log10(evals), linetype=2) + 
+  # geom_vline(xintercept = -log10(evals), linetype=2) + 
   coord_fixed(expand = 0) +
-  labs(x="-log10(Evalue Blast)",y="-log10(Evalue Foldseek)") +
+  labs(x="-log10(Evalue BlastP)",y="-log10(Evalue Foldseek)") +
   scale_x_continuous(limits = c(0, 20)) +
   scale_y_continuous(limits = c(0, 20)) +
   theme(legend.position = "none", panel.grid = element_blank()) 
@@ -351,21 +318,24 @@ eval_p <- add_marginal(mutate(df,
 pident_p <- ggplot(df, aes(pident_Blast, pident_Foldseek)) + 
   stat_bin_2d(breaks=seq(0,100,2)) + 
   scale_fill_gradientn(colors=wespal) +
+  ggpubr::stat_cor(label.x.npc = .025) +
   # scale_fill_viridis_c(option = "C") +
   coord_fixed(expand = 0) +
   scale_x_continuous(limits = c(0, 100)) +
   scale_y_continuous(limits = c(0, 100)) +
-  labs(x="Identity Blast",y="Identity Foldseek") +
+  labs(x="% Identity BlastP",y="% Identity Foldseek") +
   theme(legend.position = "none", panel.grid = element_blank())
 pident_p <- add_marginal(df, pident_p, "pident_Blast", "pident_Foldseek", "singleton", palette_singleton_p)
 
+
 qcov_p <- ggplot(df, aes(qcov_Blast, qcov_Foldseek)) + 
   stat_bin_2d(breaks=seq(0,100,2)) + 
-  geom_hline(yintercept = min_covs, linetype=2) + 
-  geom_vline(xintercept = min_covs, linetype=2) + 
+  ggpubr::stat_cor(label.x.npc = .025) +
+  # geom_hline(yintercept = min_covs, linetype=2) + 
+  # geom_vline(xintercept = min_covs, linetype=2) + 
   scale_x_continuous(limits = c(0, 100)) +
   scale_y_continuous(limits = c(0, 100)) +
-  labs(x="Query cov. Blast",y="Query cov. Foldseek") +
+  labs(x="Query cov. BlastP",y="Query cov. Foldseek") +
   scale_fill_gradientn(colors=wespal) +
   coord_fixed(expand = 0) +
   theme(legend.position = "none", panel.grid = element_blank()) 
@@ -410,8 +380,9 @@ plddt_p <- df %>%
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank())
 
-df_multi <- df_filtered %>% 
-    # head(n = 100000) %>%
+df_multi <- df_filt %>% 
+  select(query, target, singleton) %>% 
+    head(n = 1000) %>%
   left_join(CATH_df, by=c("query"="target")) %>% 
   filter(!is.na(Pfam), !is.na(Gene3D)) %>% 
   left_join(CATH_df, by="target") %>% 
@@ -441,14 +412,16 @@ CATH_plot <- df_multi %>%
   ggplot(aes(Jaccard, freq, fill=singleton)) + 
   geom_bar(stat = "identity",position = "dodge") + 
   facet_grid(name~.) +
-  labs(y="% in group") +
+  labs(y="% in Singleton group", x="Jaccard Index", 
+       fill="Target sets") +
   scale_y_continuous(expand = expansion(0.01,0)) + 
   scale_fill_manual(values=palette_singleton_p) +
-  theme(legend.position = "bottom",
+  theme(legend.position = "top",
         panel.background = element_rect(fill=NA, color="black"),
         axis.line = element_blank(),
         axis.text.x = element_text(size=8))
-  
+
+
 # prop_p <- group_by(df_filtered) %>% 
 #   count(query, singleton) %>% 
 #   group_by(query) %>% 
@@ -489,6 +462,18 @@ df_ml <- read_delim(glue(outdir,"/trees/", params_dataset$seed, "_mltrees.txt"),
                                 gsub("\\+.*", "", Model))), levels=models), 
          rate=sub("\\+", "", gsub("GTR20|3DI|LG", "", Model)))
 
+disco_fls <- list.files(glue(outdir, "/reco/disco"), pattern = "output.nwk", full.names = T)
+
+disco_rf <- NULL
+for (file in disco_fls){
+  a <- read.tree(file)
+  rf <- TreeDist::RobinsonFoulds(sptree, a, normalize = T)
+  ntips <- sapply(a, function(x) length(x$tip.label))
+  disco_rf <- bind_rows(disco_rf, 
+                        tibble(ntips=ntips, rf=rf, bn=rep(basename(file), length(rf))))
+}
+
+
 # Read all trees
 ts <- read.tree(text = df_trees$tree)
 names(ts) <- paste(df_trees$gene, df_trees$target, df_trees$alphabet, df_trees$model, sep = "_")
@@ -505,7 +490,7 @@ rf_df <- filter(df_trees, target=="common") %>%
   select(-tree.x, -tree.y)
 
 rf_text <- group_by(rf_df, model.x, model.y) %>% 
-  filter(as.integer(model.x)<=as.integer(model.y)) %>% 
+  # filter(as.integer(model.x)<=as.integer(model.y)) %>% 
   summarise(value=median(RF, na.rm=T))
 
 # get BS distribution
@@ -517,139 +502,149 @@ df_bs <- fortify(ts) %>%
   filter(!is.na(support)) %>% 
   select(gene, target, model, support)
 
-# Reconciliation ranger+TCS scores
-reco <- read_delim(glue(outdir,"/reco/", params_dataset$seed, "_DTL.tsv"), 
-                   show_col_types = FALSE) 
+n_tips <- sapply(ts, function(x) length(x$tip.label)) %>% 
+  enframe() %>%
+  separate(name, c("gene", "target", "alphabet", "model")) %>%
+  rename("n_tips"="value")
 
-scores <- read_delim(glue(outdir,"/reco/", params_dataset$seed, "_scores.tsv"), 
-                     show_col_types = FALSE) %>% 
-  left_join(reco) %>% 
+n_sps <- sapply(ts, function(x) 
+  length(unique(taxidmap[taxidmap$target %in% x$tip.label, ]$Tax_ID))) %>% 
+  enframe() %>%
+  separate(name, c("gene", "target", "alphabet", "model")) %>%
+  rename("n_sps"="value")
+
+var_df <- sapply(ts, function(x)
+  var(adephylo::distRoot(phytools::midpoint_root(x)))) %>% 
+  enframe() %>%
+  separate(name, c("gene", "target", "alphabet", "model")) %>%
+  rename("variance_r2t"="value")
+
+# Reconciliation ranger+TCS scores
+reco <- read_delim(glue(outdir,"/reco/", params_dataset$seed, "_notung.tsv"), 
+                   show_col_types = FALSE, col_names = c("gene", "dups", "losses")) %>% 
+  separate(gene, c("gene", "target", "alphabet", "model")) %>% 
+  left_join(var_df) %>% 
+  left_join(n_tips) %>% 
+  left_join(n_sps) %>% 
   mutate(model=factor(model, levels=models),
-         scores, n_events = (dups+losses)/n_tips)
+         n_events = (dups+losses)/n_tips) %>% 
+  rename("targets"="target")
 ```
 
 
 ```{r fig3}
-my_comparisons <- list( c("LG", "3Di"), c("3Di", "GTR"), c("LG", "GTR") )
-plot_bs <- df_bs %>% 
-  mutate(targets=target) %>% 
-  # group_by(gene, target, model) %>% 
-  # summarise(mn_bs=mean(support)) %>% 
-  ggplot(aes(model, support, fill=targets)) +
-  # geom_violin(position = position_dodge(width = 1)) +
-  geom_boxplot(outlier.size = .1) +
-  # ggdist::stat_pointinterval(position = position_dodge(width = 1), color="black") +
-  scale_fill_manual(values = palettes_method) +
-  theme_classic() +
-  labs(y="Boostrap", x="") 
-  # theme(legend.position = "bottom") 
-  # ggpubr::stat_compare_means(aes(group = model),
-  #                            comparisons = my_comparisons,
-  #                            label = "p.format")
 
-
-rf_plot <- rf_df %>% 
-  ggplot(aes(RF)) +
-  geom_tile(aes(x=0.5, y=0.5, fill=value), data = rf_text) +
-  geom_text(aes(x=0.5, y=.5, label=round(value, 2)), color="white", data = rf_text) +
-  geom_rug(linewidth=.1, data= . %>% filter(as.integer(model.x)>as.integer(model.y))) +
-  geom_density(aes(y = after_stat(scaled)), data= . %>% filter(as.integer(model.x)>as.integer(model.y))) + 
-  scale_fill_distiller(palette="YlGnBu", direction = -1, limits = c(0,1), 
-                       name="Median RF") + 
-  scale_x_continuous(breaks = c(0,.25,.5, .75,1), labels = function(x) sprintf("%.2g", x)) +
-  coord_cartesian(xlim = c(0,1), expand=0) +
-  # facet_grid(method~method2, switch = "both") +
-  facet_grid(model.x~model.y) +
-  # ggh4x::facet_nested(targets+model~targets2+model2, nest_line = element_line(linetype = 1)) +
-  labs(x="RF Distance") +
-  theme_classic() +
-  theme(legend.position = "bottom", 
-        panel.background = element_rect(fill='transparent'),
-        strip.placement = "outside",
-        strip.background = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        # strip.text = element_text(size=6),
-        axis.text.x = element_text(size=6),
-        axis.text.y = element_blank(),
-        axis.line.y = element_blank(),
-        axis.ticks.y = element_blank(),
-        axis.title.y = element_blank(),
-        legend.margin=margin(0,0,0,0),
-        legend.box.margin=margin(-20,0,0,0))
-
-comps <- NULL
-idx <- 1
-for (el in df_trees$target %>% unique()){
-  for (el2 in df_trees$target %>% unique()){
-    if (el>el2){
-    comps[[idx]] <- c(el, el2)
-    idx <- idx+1
-    }
-  }
-}
-
-ttest <- scores %>%
-  filter(model!="FTPY", id %in% id_tmp) %>%
-  group_by(model) %>% 
-  rstatix::t_test(n_events~targets) %>% 
-  rstatix::add_xy_position(x="model", dodge = 0.8)
-
-bxp <- scores %>% 
-  filter(model!="FTPY", id %in% id_tmp) %>%
-  ggpubr::ggboxplot(x = "model", y = "n_events", fill = "targets",
-                    palette = palettes_method)
-
-bxp +
-ggpubr::stat_pvalue_manual(ttest, label = "p")
-
-
-ggplot(scores,aes(n_tips, dups+losses, color=targets)) + 
-  geom_point(size=.1) +
-  geom_smooth(method = "lm", alpha=.2) +
-  facet_wrap(~model, nrow = 1,scales = "free") +
-  # coord_cartesian(xlim = c(0,50), ylim = c(0,250)) +
-  scale_color_manual(values = palettes_method)
-
-plot_DL <- scores %>% 
+plot_DL <- reco %>% 
   filter(model!="FTPY") %>% 
   ggplot(aes(model, n_events, fill=targets)) +
   geom_boxplot(outlier.size = .1) +
-  labs(x="", y="(D+L)/# Tips") +
+  labs(y="(D+L)/# Tips", x="",fill="Target sets") +
   # ggthemes::scale_fill_solarized() +
-  scale_fill_manual(values = palettes_method)
-  # theme(legend.position = "bottom")
+  scale_fill_manual(values = palettes_method) +
+  theme(legend.position = "none")
 
-var_r2t <- scores %>% 
+plot_rf <- disco_rf %>% 
+  filter(ntips>10) %>% 
+  # filter(ntips>=length(sptree$tip.label)/2) %>%
+  separate(bn, c("seed", "targets", "alphabet", "model")) %>% 
+  mutate(model=factor(model, levels=models)) %>% 
+  ggplot(aes(model, rf, fill=targets)) + 
+  geom_boxplot() + 
+  scale_fill_manual(values = palettes_method) +
+  labs(x="", y="Norm. RF to species tree", fill="Target sets")
+
+
+nodes_clades <- fortify(sptree) %>% 
+  # filter(!isTip) %>% 
+  mutate(ordered = rank(y)) %>% 
+  mutate(label_int = fct_reorder(label, y)) %>%
+  select(label_int, ordered)
+
+apro_files <- list.files(glue(outdir, "/reco"), 
+                         pattern = "*support.nwk", full.names = TRUE)
+apro_trees <- read.tree(text = sapply(apro_files, readLines))
+names(apro_trees) <- sapply(str_split(basename(apro_files), "_"), 
+                            function(x) paste0(x[2], "_", x[4]))
+
+trees_df <- fortify(apro_trees) 
+nodes_df <- trees_df %>% 
+  group_by(.id) %>% 
+  mutate(ordered = rank(y)) %>% 
+  left_join(nodes_clades) %>% 
+  separate(.id, c("targets", "model")) %>% 
+  filter(!isTip, label!="") %>% 
+  mutate(label = gsub("\\[|\\]|\\'", "", str_replace_all(label, "[a-z]{1,2}[0-9]=", ""))) %>% 
+  separate(label, c("pp1", "pp2", "pp3", "f1", "f2", "f3", "q1", "q2", "q3"), 
+           ";", convert = TRUE) %>% 
+  mutate(freq=f1+f2+f3, 
+         model=factor(model, levels=models))
+
+plot_apro <- nodes_df %>%
+    filter(model!="FTPY") %>% 
+  ggplot(aes(model, q1, fill=targets)) + 
+  geom_boxplot() + 
+  scale_fill_manual(values = palettes_method) +
+  labs(x="", y="Quartet support", fill="Target sets")
+
+# firstrow <- (plot_rf + plot_DL + 
+#     plot_layout(guides = "collect"))
+# 
+# secondrow <- ( + 
+#     plot_layout(guides = "collect", widths = c(1,2)))
+
+fig3 <- plot_rf + plot_apro + plot_DL +
+  plot_layout(guides = "collect") +
+  plot_annotation(tag_levels = "A") & 
+  theme(plot.tag = element_text(size = 10, face = "bold", family = "Helvetica"),
+        legend.position = "bottom")
+
+ggsave("draft/figures/fig3.pdf", fig3, width = 10, height = 4)
+# reco_rnkgs_plot <- reco %>% 
+#   group_by(gene, target) %>% 
+#   slice_min(n_events, with_ties = T) %>% 
+#   group_by(target, model) %>% 
+#   count() %>% 
+#   ggplot(aes(target, n, fill=model)) + 
+#   geom_bar(stat = "identity") +
+#   geom_text(aes(label=n), position = position_stack()) +
+#   scale_fill_manual(values = palettes_model)
+```
+
+
+```{r FigS1}
+plot_bs <- df_bs %>% 
+  mutate(targets=target,
+         model=factor(model, levels=models)) %>% 
+  ggplot(aes(model, support, fill=targets)) +
+  geom_boxplot(outlier.size = .1) +
+  scale_fill_manual(values = palettes_method) +
+  theme_classic() +
+  labs(y="Boostrap", x="", fill="") +
+  theme(legend.position = "bottom")
+
+var_r2t <- reco %>% 
   filter(model!="FTPY", targets=="common") %>% 
-  ggplot(aes(fill=model, variance_r2t)) + 
-  # geom_density(size=1, alpha=.5) +
-  geom_histogram(position = "dodge") +
-    # geom_histogram(position = "dodge") + 
-  # coord_cartesian(expand = 0) +
-  scale_x_continuous(limits = c(0,.2), expand = expansion(mult=0)) + 
-  scale_y_continuous(expand = expansion(mult=0),
-                     breaks = c(0,100,200)) +
-  # facet_grid(model~.) +
-  labs(x="Variance Root-to-tip") +
-  scale_fill_manual(values = palettes_model) +
-  theme(legend.position = 'bottom',
+  ggplot(aes(variance_r2t, model)) +
+  geom_violin(scale = "width", color="black", fill="grey40") +
+  scale_x_continuous(limits = c(0,.5), expand = expansion(mult=0, add = c(0,0.05))) +
+  labs(x="Variance Root-to-tip distance") +
+  # scale_fill_manual(values = palettes_model) +
+  theme(legend.position = 'none',
         legend.margin=margin(0,0,0,0),
         legend.box.margin=margin(-10,0,0,0))
 
-secondcolumn <- (plot_DL + plot_bs + 
-    plot_layout(guides = "collect", widths = c(5,3)) &
-    theme(legend.position = 'bottom',
-          legend.margin=margin(0,0,0,0),
-          legend.box.margin=margin(-20,0,0,0))) / var_r2t
+rf_plot <- rf_text %>% 
+  ggplot(aes(model.x, model.y)) +
+  geom_tile(aes( fill=value)) +
+  geom_text(aes(label=round(value, 2)), color="white") +
+  scale_fill_distiller(palette="YlGnBu", direction = -1, limits = c(0,1), 
+                       name="Median RF") + 
+  labs(x="Median RF Distance", y="") +
+  theme_classic() +
+  theme(legend.position = "none", 
+        axis.line = element_blank(),
+        axis.ticks = element_blank())
 
-fig3 <- (rf_plot | secondcolumn) +
-  plot_annotation(tag_levels = 'A') & 
-  theme(plot.tag = element_text(size = 10, face = "bold", family = "Helvetica"))
-ggsave("draft/figures/fig3.pdf", fig3, width = 11, height = 6)
-```
-
-```{r FigS1}
 df_red <- select(df_filtered, query, target, singleton) 
 
 res <- NULL
@@ -685,40 +680,23 @@ plot_dist <- res %>%
     alpha = 1,
     # position= position_nudge(y=-.5)
   ) + 
+  labs(x="Normalised internode distance", y="Method", fill="") +
   scale_x_continuous(expand = c(0,0.01), limits = c(0,1)) +
   theme(panel.border = element_rect(fill = NA)) + 
   scale_fill_manual(values = palette_singleton_p) + 
   theme(legend.position = "bottom")
 
+fig_s1 <- ((plot_bs / rf_plot) + 
+             plot_layout(heights = c(2,1)) | 
+             (plot_dist / var_r2t) + 
+             plot_layout(heights = c(2,1))) +
+  plot_layout(widths = c(1, 2)) +
+  plot_annotation(tag_levels = 'A') & 
+  theme(plot.tag = element_text(size = 10, face = "bold", family = "Helvetica"))
+ggsave("draft/figures/figS1.pdf", fig_s1, width = 10, height = 6)
+```
 
-labeled_sptree <- read.tree("data/sptrees/homo_internal.spTree.nw")
-nodes_clades <- fortify(labeled_sptree) %>% 
-  # filter(!isTip) %>% 
-  mutate(ordered = rank(y)) %>% 
-  mutate(label_int = fct_reorder(label, y)) %>%
-  select(label_int, ordered)
-
-clades <- read_delim(params_dataset$taxons_file, show_col_types = FALSE)
-
-apro_files <- list.files(glue(outdir, "/reco"), 
-                         pattern = "*support.nwk", full.names = TRUE)
-apro_trees <- read.tree(text = sapply(apro_files, readLines))
-names(apro_trees) <- sapply(str_split(basename(apro_files), "_"), 
-                            function(x) paste0(x[2], "_", x[4]))
-
-trees_df <- fortify(apro_trees) 
-nodes_df <- trees_df %>% 
-  group_by(.id) %>% 
-  mutate(ordered = rank(y)) %>% 
-  left_join(nodes_clades) %>% 
-  separate(.id, c("targets", "model")) %>% 
-  filter(!isTip, label!="") %>% 
-  mutate(label = gsub("\\[|\\]|\\'", "", str_replace_all(label, "[a-z]{1,2}[0-9]=", ""))) %>% 
-  separate(label, c("pp1", "pp2", "pp3", "f1", "f2", "f3", "q1", "q2", "q3"), 
-           ";", convert = TRUE) %>% 
-  mutate(freq=f1+f2+f3)
-
-
+```{r FigS2}
 pp1_plot <- nodes_df %>%
     filter(model!="FTPY") %>% 
     ggplot(aes(q1, label_int, fill=model, color=model, group=model)) +
@@ -738,89 +716,21 @@ pp1_plot <- nodes_df %>%
   theme(legend.position = "bottom", legend.box="vertical") + 
   theme_bw()
 
-
-nodes_df %>% 
-  ggplot(aes(label_int, f1+f2+f3, fill=model)) + 
-  geom_bar(stat="identity", position = "dodge") +
-  facet_grid(targets~.) +
-  scale_fill_manual(values=palettes_model)
-
+labeled_sptree <- sptree
+labeled_sptree$tip.label <- tax$Species[match(labeled_sptree$tip.label, tax$mnemo)]
 
 sptree_plot <- ggtree(labeled_sptree) + 
-  geom_tiplab() + 
+  geom_tiplab(aes(label=sub("[^A-Z].+? ", ". ", label)),fontface="italic",
+              align = TRUE) + 
   geom_nodelab(color="firebrick", 
                nudge_x = -.15, hjust = 1, 
-               nudge_y = .3, size=2)+
-  scale_x_continuous(expand = c(.2,.2))
-  
+               nudge_y = .3, size=3.5)+
+  xlim(c(-4, 21))
 
-plot_ntips <- scores %>% 
-  filter(model!="FTPY") %>% 
-  ggplot(aes(n_tips, dups+losses, color=targets)) + 
-  geom_point(size=.2) +
-  geom_smooth(method = "lm") +
-  facet_grid(~model) + 
-  scale_color_manual(values = palettes_method) +
-  theme_classic() + 
-  theme(panel.border = element_rect(fill=NA),
-        legend.position = "bottom")
-
-fig_s1 <- (plot_dist + sptree_plot + pp1_plot) +
-  plot_layout(widths = c(1.4, 1, 1.6)) + 
-  plot_annotation(tag_levels = 'A') & 
+fig_s2 <- (sptree_plot + pp1_plot) +
+  plot_layout(widths = c(1, 1.5)) +
+  plot_annotation(tag_levels = 'A') &
   theme(plot.tag = element_text(size = 10, face = "bold", family = "Helvetica"))
-ggsave("draft/figures/figS1.pdf", fig_s1, width = 14, height = 6)
-
-# fig_s1 <- (plot_ntips / ((plot_dist + sptree_plot + pp1_plot) +
-#                            plot_layout(widths = c(1.4, 1, 1.6)))) + 
-#   plot_layout(heights = c(.75,1)) 
-# ggsave("draft/figures/figS1.pdf", fig_s1, width = 14, height = 8)
-```
-
-## Answers to Edu's comments
-
-```{r}
-df %>% 
-  filter(query %in% seeds) %>% 
-  count(query, singleton) %>% 
-  ggplot(aes(n, singleton, fill=singleton)) +
-  geom_boxplot()
-   
-
-blast_filtered_eval <- filter(blast, 
-                         query %in% paste0("AF-", aln_seeds, "-F1"),
-                         evalue<as.numeric(params$eval_both)) %>% 
-  group_by(query) %>% 
-  slice_head(n = params$max_seqs) %>% 
-  ungroup()
-
-fs_filtered_eval <- filter(fs, 
-                      query %in% paste0("AF-", aln_seeds, "-F1"),
-                      evalue<as.numeric(params$eval_both)) %>% 
-  group_by(query) %>% 
-  slice_head(n = params$max_seqs) %>% 
-  ungroup()
-
-df_filtered_eval <- full_join(blast_filtered_eval, fs_filtered_eval,
-                by = c("query", "target"), suffix=c("_Blast", "_Foldseek")) %>%
-    filter(query!=target) %>% 
-  left_join(self, by="query") %>%
-  mutate(pident_Foldseek = 100*pident_Foldseek, 
-         qcov_Foldseek = 100*qcov_Foldseek,
-         singleton = case_when(is.na(evalue_Foldseek) ~ "only Blast",
-                               is.na(evalue_Blast) ~ "only Foldseek", 
-                               .default = "Common"))
-
-select(df_filtered_eval, query, target, singleton) %>% 
-  mutate(method="only-eval") %>% 
-  rbind(select(df_filtered, query, target, singleton) %>% 
-          mutate(method="qcov-tcov")) %>% 
-  group_by(method, singleton) %>% 
-  summarise(n = n()) %>%
-  mutate(freq = n / sum(n))
-
-res %>% 
-  group_by(singleton, model) %>% 
-  summarise(median(nn_dist/max_dist))
+ggsave("draft/figures/figS2.pdf", fig_s2, width = 12, height = 6, device = cairo_pdf)
 ```
 

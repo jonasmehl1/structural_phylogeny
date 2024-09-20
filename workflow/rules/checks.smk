@@ -243,29 +243,48 @@ for file in {input}; do
 done >> {output}
 '''
 
-def seeds_rangers(wildcards):
+
+def seeds_notung(wildcards):
     checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln
     with open(checkpoint_output) as all_genes:
         seed_genes = [gn.strip() for gn in all_genes]
-    outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_{mode}_{comb}_ranger.txt", 
+    outfiles = expand(outdir+"/reco/notung/{seed}/{i}_{mode}_{comb}_rnm.nwk.rooting.0.parsable.txt", 
                       seed=wildcards.seed, i=seed_genes, mode=config["modes"], 
                       comb=config["combinations"])
     return outfiles
 
-rule merge_Ranger:
-    input: seeds_rangers
-    output: 
-        DTLs=outdir+"/reco/{seed}_DTL.tsv",
-        mrca=outdir+"/reco/{seed}_mrca.tsv"
+rule merge_Notung:
+    input: seeds_notung
+    output: outdir+"/reco/{seed}_notung.tsv"
     shell: '''
-echo -e "id\\ttargets\\talphabet\\tmodel\\treco_score\\tdups\\ttransfers\\tlosses" > {output.DTLs}
-echo -e "id\\tn\\tmrca" > {output.mrca}
-
 for file in {input}; do
-    DTL=$(grep reco $file | grep -E "[0-9]+" -o | paste -s -d'\\t')
-    echo -e "$(basename $file "_ranger.txt" | tr '_' '\\t')\\t$DTL" >> {output.DTLs}
-    grep "Duplication, Mapping" $file | awk 'NF>1{{print $NF}}' | \
-    sort | uniq -c | sed -E 's/^ *//; s/ /\\t/' | \
-    awk -v file=$(basename $file "_ranger.txt") '{{print file"\\t"$0}}' >> {output.mrca} || true 
-done
+echo -e "$(basename $file | cut -f1,2,3,4 -d'_')\\t$(awk 'NR==1' $file | cut -f2,5)"
+done > {output}
 '''
+
+# def seeds_rangers(wildcards):
+#     checkpoint_output = checkpoints.check_orphans.get(**wildcards).output.continue_aln
+#     with open(checkpoint_output) as all_genes:
+#         seed_genes = [gn.strip() for gn in all_genes]
+#     outfiles = expand(outdir+"/seeds/{seed}/{i}/{i}_{mode}_{comb}_ranger.txt", 
+#                       seed=wildcards.seed, i=seed_genes, mode=config["modes"], 
+#                       comb=config["combinations"])
+#     return outfiles
+
+# rule merge_Ranger:
+#     input: seeds_rangers
+#     output: 
+#         DTLs=outdir+"/reco/{seed}_DTL.tsv",
+#         mrca=outdir+"/reco/{seed}_mrca.tsv"
+#     shell: '''
+# echo -e "id\\ttargets\\talphabet\\tmodel\\treco_score\\tdups\\ttransfers\\tlosses" > {output.DTLs}
+# echo -e "id\\tn\\tmrca" > {output.mrca}
+
+# for file in {input}; do
+#     DTL=$(grep reco $file | grep -E "[0-9]+" -o | paste -s -d'\\t')
+#     echo -e "$(basename $file "_ranger.txt" | tr '_' '\\t')\\t$DTL" >> {output.DTLs}
+#     grep "Duplication, Mapping" $file | awk 'NF>1{{print $NF}}' | \
+#     sort | uniq -c | sed -E 's/^ *//; s/ /\\t/' | \
+#     awk -v file=$(basename $file "_ranger.txt") '{{print file"\\t"$0}}' >> {output.mrca} || true 
+# done
+# '''
