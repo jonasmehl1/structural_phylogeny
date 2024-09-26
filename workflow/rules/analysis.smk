@@ -111,11 +111,19 @@ cut -f2,3 {input} | taxonkit reformat -I 1 | sed 's/;/,/g' | awk 'NR>1' > {outpu
 
 rule plot_trees:
     input: 
+        sptree=config['species_tree'],
         # scores=rules.get_verticality.output,
         reco=rules.merge_Notung.output,
         trees=outdir+"/trees/{seed}_unrooted_trees.txt",
-        mltrees=outdir+"/trees/{seed}_mltrees.txt"
+        mltrees=outdir+"/trees/{seed}_mltrees.txt",
+        table=rules.get_taxon_file.output,
+        taxidmap=rules.make_blastdb.output.mapid,
+        disco=expand(outdir+"/reco/disco/{seed}_{mode}_{comb}_disco_output.nwk", 
+                     seed=config['seed'], mode=config["modes"], comb=config["combinations"]),
+        apro_trees=expand(outdir+"/reco/{seed}_{mode}_{comb}_apro_support.nwk", 
+                     seed=config['seed'], mode=config["modes"], comb=config["combinations"])
     output:
+        apro=outdir+"/plots/{seed}_astral_pro.pdf",
         model=outdir+"/plots/{seed}_trees.pdf",
         reco=outdir+"/plots/{seed}_discordance.pdf"
     conda: "../envs/sp_R.yaml"
@@ -192,14 +200,14 @@ disco.py -i {output.gt} -o {output.gt_out}
 '''
 
 
-rule plot_astral_pro:
-    input:
-        sptree=config['species_tree'],
-        table=rules.get_taxon_file.output,
-        trees=expand(outdir+"/reco/{seed}_{mode}_{comb}_apro_support.nwk", 
-                     seed=config['seed'], mode=config["modes"], comb=config["combinations"])
-    output: outdir+"/plots/{seed}_astral_pro.pdf"
-    conda: "../envs/sp_R.yaml"
-    script: "../scripts/analyze_apro.R"
+# rule plot_astral_pro:
+#     input:
+#         sptree=config['species_tree'],
+#         table=rules.get_taxon_file.output,
+#         trees=expand(outdir+"/reco/{seed}_{mode}_{comb}_apro_support.nwk", 
+#                      seed=config['seed'], mode=config["modes"], comb=config["combinations"])
+#     output: outdir+"/plots/{seed}_astral_pro.pdf"
+#     conda: "../envs/sp_R.yaml"
+#     script: "../scripts/analyze_apro.R"
 # reco_dir=$(dirname {input.trees} | sort -u)
 

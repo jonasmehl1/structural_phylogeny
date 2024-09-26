@@ -50,13 +50,14 @@ You can change the directory where all these data are stored with `params["data_
 To run the actual pipeline you just need as input the species tree and the previous uniprot table file. Once you have these you can decide the target sets and the methodological implementations that you'd like to explore:
 
 ```yaml
-combinations: ["3Di_3Di", "aa_QT", "aa_LG", "3Di_GTR", "3Di_FT"]
-combinations_ML: ["3Di_3Di", "aa_LG", "3Di_GTR"]
+combinations: ["3Di_3Di", "aa_QT", "aa_LG", "3Di_GTR", "3Di_FT", "3Di_LLM", "3Di_AF"]
 #, "3Di_FTPY"]
-modes: ['blast', 'fs', 'common', 'union']
+# Subset of the first one that requires ML 
+combinations_ML: ["3Di_3Di", "aa_LG", "3Di_GTR", "3Di_LLM", "3Di_AF"]
 ```
+<!-- modes: ['blast', 'fs', 'common', 'union'] -->
 
-Any subset of these should work fine. Another important parameter is the `seed`. You can specify one or a list of many (although this feature is more or less untested) and the pipeline will create one output per seed species.
+Another important parameter is the `seed`. You can specify one or a list of many (although this feature is more or less untested) and the pipeline will create one output per seed species.
 
 To run the pipeline you can simply run this command and monitor that everything is more or less running fine.
 
@@ -75,3 +76,5 @@ snakemake --configfile config/test.yaml -p -j2 -k --sdm conda
 
 <!-- * add [notung](http://amberjack.compbio.cs.cmu.edu/Notung/Notung-2.9.1.5.zip) and remove ranger dtl. -->
 * look at [Reseek](https://github.com/rcedgar/reseek) and maybe implement it
+* File structure is a bit complicated and there is a bit of redundancy, for example rerunning blast everytime or the metadata.
+* Remove requisite for specifying common and union set. -> rethink runtime plots and in general output plots

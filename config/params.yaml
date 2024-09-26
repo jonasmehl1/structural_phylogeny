@@ -6,9 +6,9 @@ low_confidence: 40
 min_len: 0
 
 # possible methodological combination. You can exclude whichever
-combinations: ["3Di_3Di", "aa_QT", "aa_LG", "3Di_GTR", "3Di_FT"]
+combinations: ["3Di_3Di", "aa_QT", "aa_LG", "3Di_GTR", "3Di_FT", "3Di_LLM", "3Di_AF"]
 # Subset of the first one that requires ML 
-combinations_ML: ["3Di_3Di", "aa_LG", "3Di_GTR"]
+combinations_ML: ["3Di_3Di", "aa_LG", "3Di_GTR", "3Di_LLM", "3Di_AF"]
 #, "3Di_FTPY"]
 
 # Target sets, you can exclude whichever to reduce computations
@@ -43,9 +43,9 @@ distboot: 100
 
 # files and folders
 subst_matrix: 'resources/subst_matrixes/mat3di.out'
-subst_matrix_tree: 'resources/subst_matrixes/3DI.nexus'
+subst_matrix_3di: 'resources/subst_matrixes/3DI.nexus'
+subst_matrix_LLM: 'resources/subst_matrixes/Q_mat_LLM_Garg.txt'
+subst_matrix_AF: 'resources/subst_matrixes/Q_mat_AF_Garg.txt'
 
 data_dir: 'results/data/'
 outdir: 'results/'
-
-Notung: '/gpfs/projects/bsc40/current/gmutti/software/reconciliation/Notung/Notung-2.9.1.5.jar'

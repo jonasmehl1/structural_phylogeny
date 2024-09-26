@@ -1,11 +1,11 @@
-library(tidyverse)
+suppressPackageStartupMessages(library(tidyverse))
 library(patchwork)
-library(cowplot)
+suppressPackageStartupMessages(library(cowplot))
 source("workflow/scripts/functions.R")
 theme_set(theme_bw())
 
 taxidmap <- read_delim(snakemake@input[["taxidmap"]], 
-                       col_names = c("target", "Tax_ID"), show_col_types=F)
+                       col_names = c("target", "Tax_ID"), show_col_types=FALSE)
 
 # tax <- read_delim(snakemake@input[["groups"]], show_col_types=F)
 # # read input table
@@ -14,18 +14,20 @@ taxidmap <- read_delim(snakemake@input[["taxidmap"]],
 # table_columns <- c('Proteome_ID', 'Tax_ID', 'count1', 'count2', 'count3', 
 #                    'genome', 'source', 'species', 'mnemo')
 
-table <- read_delim(snakemake@input[["table"]], show_col_types=F, 
+table <- read_delim(snakemake@input[["table"]], show_col_types=FALSE, 
                     delim = "\t") 
   # left_join(tax, by = "Tax_ID") %>% 
   # mutate(Clade = ifelse(is.na(Clade), mnemo, Clade),
   #        Clade = factor(Clade, levels = lvls_tax))
 
-blast_self <- read_delim(snakemake@input[["self_blast"]], col_names = blast_columns) %>% 
+blast_self <- read_delim(snakemake@input[["self_blast"]], show_col_types=FALSE, 
+                        col_names = blast_columns) %>% 
   filter(query==target) %>% 
   mutate(blast_selfbit=bitscore) %>% 
   select(query, blast_selfbit)
 
-fs_self <- read_delim(snakemake@input[["self_fs"]], col_names = fs_columns) %>% 
+fs_self <- read_delim(snakemake@input[["self_fs"]], show_col_types=FALSE, 
+                      col_names = fs_columns) %>% 
   filter(query==target) %>% 
   mutate(fs_selfbit=bitscore) %>% 
   select(query, fs_selfbit)

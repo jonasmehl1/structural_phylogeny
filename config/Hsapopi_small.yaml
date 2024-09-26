@@ -5,11 +5,10 @@ species_tree: 'data/sptrees/homo_internal.spTree.nw'
 seed: ['UP000005640']
 root: 'Atha'
 
-combinations: ["3Di_3Di", "aa_LG"]
-combinations_ML: ["3Di_3Di", "aa_LG"]
-#, "3Di_FTPY"]
-modes: ['blast']
-foldmason_set: 'blast'
+# combinations: ["3Di_3Di", "aa_QT"]
+# # Subset of the first one that requires ML 
+# combinations_ML: ["3Di_3Di"]
+# modes: ['blast', 'common', 'fs']
 
 # this is the number of seed genes to run the pipeline
 test_seeds: 5

@@ -238,9 +238,10 @@ echo -e "gene\\ttargets\\tModel\\tLogL\\tAIC\\tw-AIC\\tAICc\\tw-AICc\\tBIC\\tw-B
 for file in {input}; do
     gene=$(basename $file ".iqtree" | cut -f1 -d'_')
     targets=$(basename $file ".iqtree" | cut -f2 -d'_')
-    model_line=$(grep -E '^(LG|GTR20|3DI)' $file | awk 'NR==1' | awk -v OFS="\\t" '$1=$1' | sed 's/\\t[+-]\\t/\\t/g')
+    model_line=$(grep -E '^(LG|GTR20|3DI|resources)' $file | awk 'NR==1' | awk -v OFS="\\t" '$1=$1' | sed 's/\\t[+-]\\t/\\t/g')
     echo -e "$gene\\t$targets\\t$(echo $model_line | tr ' ' '\\t')"
-done >> {output}
+done | \
+sed 's/resources\/subst_matrixes\/Q_mat_//g ; s/_Garg.txt//g'>> {output}
 '''
 
 

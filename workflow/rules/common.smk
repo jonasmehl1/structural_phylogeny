@@ -18,9 +18,11 @@ rule iqtree:
         # ufboot=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}.ufboot",
         iqtree=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}.iqtree"
     wildcard_constraints:
-        model="GTR|LG|3Di"
+        model="GTR|LG|3Di|LLM|AF"
     params: 
-        submat=config['subst_matrix_tree'],
+        threedi_submat=config['subst_matrix_3di'],
+        LLM_submat=config['subst_matrix_LLM'],
+        AF_submat=config['subst_matrix_AF'],
         ufboot=config['UF_boot']
     log: outdir+"/log/iqtree/{seed}_{i}_{mode}_{alphabet}_{model}.log"
     benchmark: outdir+"/benchmarks/iqtree/{seed}_{i}_{mode}_{alphabet}_{model}.txt"
@@ -33,7 +35,11 @@ model={wildcards.model}
 if [ "$model" == "GTR" ]; then
     model="GTR20"
 elif [ "$model" == "3Di" ]; then
-    model="3DI -mdef {params.submat}"
+    model="3DI -mdef {params.threedi_submat}"
+elif [ "$model" == "LLM" ]; then
+    model={params.LLM_submat}
+elif [ "$model" == "AF" ]; then
+    model={params.AF_submat}
 fi
 
 iqtree2 -s {input} --prefix $tree_prefix -B {params.ufboot} -T {threads}  --quiet \
@@ -168,8 +174,8 @@ rule Notung:
         map_ids=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}.map",
         genetree=outdir+"/seeds/{seed}/{i}/{i}_{mode}_{alphabet}_{model}_rnm.nwk",
         reco=outdir+"/reco/notung/{seed}/{i}_{mode}_{alphabet}_{model}_rnm.nwk.rooting.0.parsable.txt"
-    params: 
-        notung=config['Notung']
+    log: outdir+"/log/notung/{seed}_{i}_{mode}_{alphabet}_{model}_reco.log"
+    conda: "../envs/reco.yaml"
     shell: '''
 nw_labels {input.genetree} -I | \
 csvtk join -H -t -f 1 {input.taxidmap} - | \
@@ -177,6 +183,6 @@ awk '{{print $1"\\t"$1"_"$2}}' > {output.map_ids}
 
 nw_rename {input.genetree} {output.map_ids} > {output.genetree}
 
-java -jar {params.notung} --root --maxtrees 1 -g {output.genetree} -s {input.sptree} \
---speciestag postfix --parsable --outputdir $(dirname {output.reco})
+notung --root --maxtrees 1 -g {output.genetree} -s {input.sptree} \
+--speciestag postfix --parsable --outputdir $(dirname {output.reco}) > {log}
 '''

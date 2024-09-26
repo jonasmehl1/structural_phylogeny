@@ -17,3 +17,4 @@ dependencies:
   - r-wesanderson
   - r-cowplot
   - r-ggvenn
+  - r-treedist 
