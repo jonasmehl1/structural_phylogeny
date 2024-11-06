@@ -1,5 +1,6 @@
 # Input file
-dataset: 'small'
+homology_dataset: 'hsap_euka'
+phylo_dataset: 'hsap_1kseeds'
 taxids: 'data/input/Hsapopi_set.txt'
 species_tree: 'data/sptrees/homo_internal.spTree.nw'
 seed: ['UP000005640']
@@ -11,4 +12,6 @@ root: 'Atha'
 # modes: ['blast', 'common', 'fs']
 
 # this is the number of seed genes to run the pipeline
-test_seeds: 5
+test_seeds: 'data/seeds/draft_seeds.txt'
+# modes: ['common']
+n_examples: 1

@@ -50,7 +50,7 @@ You can change the directory where all these data are stored with `params["data_
 To run the actual pipeline you just need as input the species tree and the previous uniprot table file. Once you have these you can decide the target sets and the methodological implementations that you'd like to explore:
 
 ```yaml
-combinations: ["3Di_3Di", "aa_QT", "aa_LG", "3Di_GTR", "3Di_FT", "3Di_LLM", "3Di_AF"]
+combinations: ["3Di_3Di", "aa_FM_", "aa_LG", "3Di_GTR", "3Di_FT", "3Di_LLM", "3Di_AF"]
 #, "3Di_FTPY"]
 # Subset of the first one that requires ML 
 combinations_ML: ["3Di_3Di", "aa_LG", "3Di_GTR", "3Di_LLM", "3Di_AF"]
@@ -74,7 +74,21 @@ snakemake --configfile config/test.yaml -p -j2 -k --sdm conda
 
 # TODOs
 
-<!-- * add [notung](http://amberjack.compbio.cs.cmu.edu/Notung/Notung-2.9.1.5.zip) and remove ranger dtl. -->
-* look at [Reseek](https://github.com/rcedgar/reseek) and maybe implement it
-* File structure is a bit complicated and there is a bit of redundancy, for example rerunning blast everytime or the metadata.
-* Remove requisite for specifying common and union set. -> rethink runtime plots and in general output plots
+* Run OMA benchmark at eukaryotic level and compute TCS and our metrics: https://github.com/DessimozLab/fold_tree?tab=readme-ov-file#benchmarking-experiments YOU HAVE A PROPER CONDA ENVIRONMENT NAMED foldtree TO DO THIS! (Ran on my workstation as you need internet)
+* Agree on final set of models
+* Check that everything is alright in the two test seeds. 
+* Do a proper eggnog and oma benchmark
+* Correlation between RF and average pLDDT of a tree
+
+* Why DL is different in union and foldseek
+* implement notebook instead of scripts to plot that can take both eggnoglike or phylomedb.
+
+# DONE
+
+* check overlap of blast and foldseek sets with various orthologous sets
+* Better representation of CATH and Pfam analysis
+* Switch from quicktree to FastME
+* 3di + aa: finish rules for partition and add pipeline to the schema -> combination= {comb_part}
+* use list of seeds as input.
+* replace X with - when masking characters
+* File structure is a bit complicated and there is a bit of redundancy, for example rerunning blast everytime or the metadata: done

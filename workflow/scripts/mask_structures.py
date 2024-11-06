@@ -17,7 +17,7 @@ if __name__ == '__main__':
         low_confidence_sites = list(confidence[confidence['confidenceScore']<min_lddt]['residueNumber'])
 
         for site in low_confidence_sites:
-            record.seq = record.seq[:site-1] + 'X' + record.seq[site:]
+            record.seq = record.seq[:site-1] + '-' + record.seq[site:]
 
         out_seqs.append(record)
 

@@ -1,9 +1,3 @@
-# input_table = pd.read_csv(config['taxids'], sep='\t')
-# input_table.columns = ['uniprot', 'taxid', 'mnemo']
-# input_dict = input_table.set_index('uniprot').T.to_dict()
-
-# codes = list(input_table['uniprot'])
-
 rule make_foldseekdb:
     input:
         all_struct=expand(config['data_dir']+'structures/{code}/high_cif', code=codes),
@@ -33,7 +27,7 @@ rule make_foldseekdb_seq:
     shell:'''
 foldseek lndb {input}_h {input}_ss_h
 foldseek convert2fasta {input}_ss {output}
-sed -i 's/-model_v4.cif.gz//g' {output}
+sed -i 's/-model_v4.cif//g' {output}
 '''
 
 rule make_foldseekdb_single:
@@ -50,7 +44,7 @@ rule foldseek:
         q=config['data_dir']+'structures/{seed}/high_cif',
         db=rules.make_foldseekdb.output
     output: 
-        outdir+"/homology/{seed}_fs.tsv"
+        outdir+"/{seed}_fs.tsv"
     params: config['target_seqs']
     log: outdir+"/log/homology/{seed}_fs.log"
     benchmark: outdir+"/benchmarks/homology/{seed}_fs.txt"
@@ -59,17 +53,27 @@ rule foldseek:
     shell:'''
 foldseek easy-search {input.q} {input.db} {output} $TMPDIR/{wildcards.seed} --threads {threads} --max-seqs {params} \
 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > {log}
-sed -i 's/-model_v4.cif.gz//g' {output}
+sed -i 's/-model_v4.cif//g' {output}
 '''
 
+rule filter_foldseek:
+    input: rules.foldseek.output
+    output: outdir+"/{seed}_fs_filtered.tsv"
+    params: 
+        eval_both=config['eval_both'],
+        coverage=config['coverage'],
+        max_seqs=config['max_seqs']
+    shell: """
+awk '$11<{params.eval_both} && $17*100>{params.coverage} && $18*100>{params.coverage}' {input} > {output}
+"""
 
 rule foldseek_allvall:
     input:
         q=config['data_dir']+'structures/{seed}/high_cif',
         t=config['data_dir']+'structures/{code}/high_cif'
     output:
-        q_t=outdir+"/homology/allvall/{seed}_{code}_fs.tsv",
-        t_q=outdir+"/homology/allvall/{code}_{seed}_fs.tsv"
+        q_t=outdir+"/allvall/{seed}_{code}_fs.tsv",
+        t_q=outdir+"/allvall/{code}_{seed}_fs.tsv"
     params: config['max_seqs_brh']
     log: outdir+"/log/homology/{code}_{seed}_fs.log"
     benchmark: outdir+"/benchmarks/homology/{code}_{seed}_fs.txt"
@@ -79,55 +83,22 @@ rule foldseek_allvall:
 foldseek easy-search {input.q} {input.t} {output.q_t} $TMPDIR/{wildcards.seed}_{wildcards.code} \
 --threads {threads} --max-seqs {params} \
 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > {log}
-sed -i 's/-model_v4.cif.gz//g' {output.q_t}
+sed -i 's/-model_v4.cif//g' {output.q_t}
 
 foldseek easy-search {input.t} {input.q} {output.t_q} $TMPDIR/{wildcards.code}_{wildcards.seed} \
 --threads {threads} --max-seqs {params} \
 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > {log}
-sed -i 's/-model_v4.cif.gz//g' {output.t_q}
+sed -i 's/-model_v4.cif//g' {output.t_q}
 '''
 
 rule foldseek_brh:
     input: 
-        a=expand(outdir+"/homology/allvall/{seed}_{code}_fs.tsv", seed=config['seed'], code=codes),
-        b=expand(outdir+"/homology/allvall/{code}_{seed}_fs.tsv", seed=config['seed'], code=codes)
+        a=expand(outdir+"/allvall/{seed}_{code}_fs.tsv", seed=config['seed'], code=codes),
+        b=expand(outdir+"/allvall/{code}_{seed}_fs.tsv", seed=config['seed'], code=codes)
     output:
-        outdir+"/homology/{seed}_fs_brh.tsv"
+        outdir+"/{seed}_fs_brh.tsv"
     params: config['eval_brh']
     conda: "../envs/sp_python.yaml"
     script: "../scripts/get_BRH.py"
 
 
-# If foldseek, retrieve sequences from "translated version"
-rule get_seqs_3Di:
-    input:
-        ids=outdir+"/seeds/{seed}/{i}/{i}_{mode}.ids",
-        fa=rules.make_foldseekdb_seq.output
-    output: outdir+"/seeds/{seed}/{i}/{i}_{mode}_3Di.seqs"
-    conda: "../envs/sp_utils.yaml"
-    shell:'''
-seqkit grep -f {input.ids} {input.fa} > {output}
-'''
-
-rule mask_seqs_3Di:
-    input: rules.get_seqs_3Di.output
-    output: outdir+"/seeds/{seed}/{i}/{i}_{mode}_3Di.masked.seqs"
-    params: 
-        structdir=config['data_dir']+"structures/",
-        min_lddt=config['min_lddt']
-    conda: "../envs/sp_python.yaml"
-    script: "../scripts/mask_structures.py"
-
-
-rule aln_3Di:
-    input: rules.mask_seqs_3Di.output
-    output: outdir+"/seeds/{seed}/{i}/{i}_{mode}_3Di.alg"
-    params: 
-        submat=config['subst_matrix']
-    log: outdir+"/log/mafft/{seed}_{i}_{mode}_3Di.log"
-    benchmark: outdir+"/benchmarks/mafft/{seed}_{i}_{mode}_3Di.txt"
-    threads: 4
-    conda: "../envs/sp_tree.yaml"
-    shell:'''
-mafft --auto --thread {threads} --aamatrix {params.submat} {input} > {output} 2> {log}
-'''

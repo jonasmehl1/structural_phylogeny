@@ -31,28 +31,30 @@ library(ggtree)
 library(cowplot)
 library(glue)
 source("workflow/scripts/functions.R")
-theme_set(theme_classic())
+theme_set(theme_classic(base_family = "Aptos"))
 
 models <- names(palettes_model)
 
 params <- yaml::read_yaml("config/params.yaml")
-params_dataset <- yaml::read_yaml("config/Hsapopi_test.yaml")
+params_dataset <- yaml::read_yaml("config/Hsap_draft.yaml")
 
-outdir <- glue(params$outdir, params_dataset$dataset)
+homodir <- glue(params$outdir, "homology/", params_dataset$homology_dataset)
+phylodir <- glue(params$outdir, "phylogeny/", params_dataset$phylo_dataset)
 ```
 
 ```{r read_stuff, cache=FALSE}
-seeds <- readLines(glue(outdir, "/ids/UP000005640_common.ids"))
+seeds <- readLines(params_dataset$test_seeds)
 
-tax <- read_delim(glue(outdir, "/meta/", params_dataset$dataset, "_uniprot_genomes.tsv"), 
+tax <- read_delim(glue("results/data/meta/",
+                       params_dataset$homology_dataset, "_uniprot_genomes.tsv"), 
                   show_col_types=F)
-taxmap <- read_delim(glue(outdir, "/db/taxidmap"), 
+taxmap <- read_delim(glue(homodir, "/db/taxidmap"), 
                      delim = "\t", col_names = c("label", "Tax_ID"),
                      show_col_types = FALSE) %>% 
   left_join(tax, by = "Tax_ID") %>% 
   dplyr::select(label, Proteome_ID, mnemo)
 
-taxidmap <- read_delim(glue(outdir,"/db/taxidmap"), 
+taxidmap <- read_delim(glue(homodir,"/db/taxidmap"), 
                        col_names = c("target", "Tax_ID"), show_col_types=F)
 
 sptree <- read.tree(params_dataset$species_tree)
@@ -67,29 +69,20 @@ for (sp in sptree$tip.label){
   species_dist_df <- bind_rows(species_dist_df, tibble(mnemo=sp, value=dist, mrca=mrca))
 }
 
-# read input table
-# lvls_tax <- rev(c(unique(tax$Clade), "archaea", "bacteria"))
-
 table_columns <- c('Proteome_ID', 'Tax_ID', 'count1', 'count2', 'count3', 
                    'genome', 'source', 'species', 'mnemo')
-
-# table <- read_delim(params_dataset$input_table_file, show_col_types=F, 
-#                     delim = "\t", col_names = table_columns) %>% 
-#   left_join(tax, by = "Tax_ID") %>% 
-#   mutate(Clade = ifelse(is.na(Clade), mnemo, Clade),
-#          Clade = factor(Clade, levels = lvls_tax))
 
 lddt_df <- read_delim(paste0(params$data_dir, "structures/", 
                              tax$Proteome_ID, "/", tax$Proteome_ID, "_mean_plddt.tsv"),
            col_names = c("target", "mean_lddt"), show_col_types = FALSE)
 
-aln_seeds <- readLines(glue(outdir,"/ids/", params_dataset$seed, "_aln.ids"))
+aln_seeds <- readLines(glue(phylodir,"/ids/", params_dataset$seed, "_aln.ids"))
 ```
 
 # Homology
 
 ```{r read_self_blast}
-blast_self <- read_delim(glue(outdir, "/homology/allvall/",
+blast_self <- read_delim(glue(homodir, "/allvall/",
                               params_dataset$seed, "_", params_dataset$seed, "_blast.tsv"),
                          show_col_types=FALSE,
                          col_names = blast_columns) %>% 
@@ -98,8 +91,8 @@ blast_self <- read_delim(glue(outdir, "/homology/allvall/",
   mutate(blast_selfbit=bitscore) %>% 
   select(query, blast_selfbit)
 
-fs_self <- read_delim(glue(outdir, "/homology/allvall/",
-                              params_dataset$seed, "_", params_dataset$seed, "_fs.tsv"), 
+fs_self <- read_delim(glue(homodir, "/allvall/", params_dataset$seed, 
+                           "_", params_dataset$seed, "_fs.tsv"), 
                       show_col_types = FALSE,
                          col_names = blast_columns) %>% 
   # filter(query %in% seeds) %>%
@@ -111,30 +104,17 @@ self <- full_join(blast_self, fs_self, by="query")
 ```
 
 
-```{r read_fs}
-fs <- read_delim(glue(outdir, "/homology/", params_dataset$seed, "_fs.tsv"), 
+```{r read_homo}
+fs <- read_delim(glue(homodir, "/", params_dataset$seed, "_fs.tsv"), 
                  col_names = fs_columns, show_col_types = FALSE) %>% 
   # filter(query %in% seeds) %>%
   mutate(evalue = ifelse(evalue==0, 1e-180, evalue)) %>%
   left_join(taxidmap, by = "target")
 
-fs_brhs <- read_delim(glue(outdir, "/homology/", params_dataset$seed, "_fs_brh.tsv"),
-                     col_names = c("query", "target"), show_col_types = FALSE) %>% 
-  # filter(query %in% seeds) %>%
-  mutate(method="fs_brh") 
-```
-
-
-```{r read_blast}
-blast <- read_delim(glue(outdir, "/homology/", params_dataset$seed, "_blast.tsv"), 
+blast <- read_delim(glue(homodir, "/", params_dataset$seed, "_blast.tsv"), 
                     col_names = blast_columns, show_col_types = FALSE) %>% 
   # filter(query %in% seeds) %>%
   mutate(evalue = ifelse(evalue==0, 1e-180, evalue))
-
-blast_brhs <- read_delim(glue(outdir, "/homology/", params_dataset$seed, "_blast_brh.tsv"),
-                     col_names = c("query", "target"), show_col_types = FALSE) %>% 
-  # filter(query %in% seeds) %>%
-  mutate(method="blast_brh")
 ```
 
 ```{r merge_homo}
@@ -148,15 +128,7 @@ df <- full_join(blast, fs,
                                is.na(evalue_Blast) ~ "only Foldseek", 
                                .default = "Common")) 
 
-brhs <- rbind(blast_brhs, fs_brhs) %>% 
-    group_by(query, target, method) %>%
-    mutate(n=1) %>%
-    pivot_wider(names_from = method, values_fill = 0, values_from = n) %>%
-    mutate(common = ifelse(fs_brh+blast_brh==2, 1, 0))
-
-
 blast_filt <- filter(blast, 
-                         # query %in% paste0("AF-", aln_seeds, "-F1"),
                          length/qlen*100>params$coverage, 
                          length/slen*100>params$coverage,
                          evalue<as.numeric(params$eval_both)) %>% 
@@ -165,7 +137,6 @@ blast_filt <- filter(blast,
   ungroup()
 
 fs_filt <- filter(fs, 
-                      # query %in% paste0("AF-", aln_seeds, "-F1"),
                       qcov*100>params$coverage, 
                       tcov*100>params$coverage, 
                       evalue<as.numeric(params$eval_both)) %>% 
@@ -182,76 +153,84 @@ df_filt <- full_join(blast_filt, fs_filt,
          singleton = case_when(is.na(evalue_Foldseek) ~ "only Blast",
                                is.na(evalue_Blast) ~ "only Foldseek", 
                                .default = "Common"))
-# grouped_brhs <- brhs %>%
-#   group_by(query) %>%
-#   summarise(fs_brh = sum(fs_brh), blast_brh=sum(blast_brh), common_brh=sum(common))
-blast_filtered <- filter(blast, 
-                         query %in% paste0("AF-", aln_seeds, "-F1"),
-                         length/qlen*100>params$coverage, 
-                         length/slen*100>params$coverage,
-                         evalue<as.numeric(params$eval_both)) %>% 
-  group_by(query) %>% 
-  slice_head(n = params$max_seqs) %>% 
-  ungroup()
 
-fs_filtered <- filter(fs, 
-                      query %in% paste0("AF-", aln_seeds, "-F1"),
-                      qcov*100>params$coverage, 
-                      tcov*100>params$coverage, 
-                      evalue<as.numeric(params$eval_both)) %>% 
-  group_by(query) %>% 
-  slice_head(n = params$max_seqs) %>% 
-  ungroup()
-
-df_filtered <- full_join(blast_filtered, fs_filtered,
-                by = c("query", "target"), suffix=c("_Blast", "_Foldseek")) %>%
-    filter(query!=target) %>% 
-  left_join(self, by="query") %>%
-  mutate(pident_Foldseek = 100*pident_Foldseek, 
-         qcov_Foldseek = 100*qcov_Foldseek,
-         singleton = case_when(is.na(evalue_Foldseek) ~ "only Blast",
-                               is.na(evalue_Blast) ~ "only Foldseek", 
-                               .default = "Common"))
+# blast_filtered <- filter(blast, 
+#                          query %in% paste0("AF-", aln_seeds, "-F1"),
+#                          length/qlen*100>params$coverage, 
+#                          length/slen*100>params$coverage,
+#                          evalue<as.numeric(params$eval_both)) %>% 
+#   group_by(query) %>% 
+#   slice_head(n = params$max_seqs) %>% 
+#   ungroup()
+# 
+# fs_filtered <- filter(fs, 
+#                       query %in% paste0("AF-", aln_seeds, "-F1"),
+#                       qcov*100>params$coverage, 
+#                       tcov*100>params$coverage, 
+#                       evalue<as.numeric(params$eval_both)) %>% 
+#   group_by(query) %>% 
+#   slice_head(n = params$max_seqs) %>% 
+#   ungroup()
+# 
+# df_filtered <- full_join(blast_filtered, fs_filtered,
+#                 by = c("query", "target"), suffix=c("_Blast", "_Foldseek")) %>%
+#     filter(query!=target) %>% 
+#   left_join(self, by="query") %>%
+#   mutate(pident_Foldseek = 100*pident_Foldseek, 
+#          qcov_Foldseek = 100*qcov_Foldseek,
+#          singleton = case_when(is.na(evalue_Foldseek) ~ "only Blast",
+#                                is.na(evalue_Blast) ~ "only Foldseek", 
+#                                .default = "Common"))
 ```
 
 
 ```{r cath}
-CATH_df <- read_delim(list.files(glue(params$data_dir, "cath"), full.names = TRUE),
+CATH_df <- read_delim(paste0(params$data_dir, "cath/", tax$Proteome_ID, "_cath.tsv"),
                       delim = "\t", id = "proteome", show_col_types = FALSE) %>%
-  # filter(!is.na(Gene3D)) %>% 
-  mutate(proteome = gsub("_cath.tsv", "", basename(proteome)),
-         n_3d_domains = str_count(Gene3D, ";"),
-         n_Pfam_domains = str_count(Pfam, ";")) %>%
-  # filter(n_domains==1) %>% 
+  mutate(proteome = gsub("_cath.tsv", "", basename(proteome))) %>%
+         # n_3d_domains = str_count(Gene3D, ";"),
+         # n_Pfam_domains = str_count(Pfam, ";")
   mutate(target=paste0("AF-", Entry, "-F1")) %>% 
-    select(-proteome, Entry)
+  rename("CATH"="Gene3D") %>% 
+  select(target, Pfam, CATH, -proteome, -Entry) %>% 
+  mutate(CAT = gsub("(\\d+\\.\\d+\\.\\d+)\\.\\d+", "\\1", CATH),
+         CA = gsub("(\\d+\\.\\d+)\\.\\d+", "\\1", CAT),
+         C = gsub("\\.\\d+", "\\1", CA))
 
-nms <- read_delim("resources/cath-names.txt", 
-                  comment = "#", delim = "    ",
-                  col_names = c("Gene3D", "abbr", "name"), 
-                  show_col_types = FALSE) %>% 
-  select(-abbr) %>% 
-  mutate(name=gsub("^:", "", name))
+ortho_dbs <- read_delim(paste0(params$data_dir, "ids/", tax$Proteome_ID, "_ids.tsv"),
+                      delim = "\t", id = "proteome", show_col_types = FALSE) %>% 
+  mutate(proteome = gsub("_ids.tsv", "", basename(proteome))) %>% 
+  mutate(target=paste0("AF-", Entry, "-F1")) %>% 
+  select(-proteome, -Entry)
 
-nms_pfam <- read_delim("resources/Pfam-A.clans.tsv", 
-           col_names = c("Pfam", "clan", "boh", "abbr", "name"), 
-           show_col_types = FALSE) %>% 
-  select(-name, -clan, -boh)
+ortho_dbs <- full_join(CATH_df, ortho_dbs)
 
-long_CATH_df <- CATH_df %>% 
-  # filter(target %in% unique(blast$query)) %>% 
-  mutate(Gene3D=strsplit(Gene3D, ";")) %>% 
-  unnest(Gene3D) %>% 
-  separate(col = Gene3D, into = c("C", "A", "T", "H"), sep = "\\.", remove = FALSE) %>% 
-  mutate(CA = paste(C,A,sep = "."), CAT=paste(C,A,T,sep = ".")) %>% 
-  left_join(nms, by=c("C"="Gene3D")) %>%  
-  left_join(nms, by=c("CA"="Gene3D"), suffix = c("_C", "_CA")) %>% 
-  left_join(nms, by=c("CAT"="Gene3D"), suffix = c("_CA", "_CAT")) %>% 
-  left_join(nms, by=c("Gene3D"), suffix = c("_CAT", "_CATH"))
-
-long_CATH_nms <- long_CATH_df %>%
-    select(-c(Entry, Pfam, n_Pfam_domains, target, n_3d_domains)) %>% 
-    distinct()
+# nms <- read_delim("resources/cath-names.txt", 
+#                   comment = "#", delim = "    ",
+#                   col_names = c("Gene3D", "abbr", "name"), 
+#                   show_col_types = FALSE) %>% 
+#   select(-abbr) %>% 
+#   mutate(name=gsub("^:", "", name))
+# 
+# nms_pfam <- read_delim("resources/Pfam-A.clans.tsv", 
+#            col_names = c("Pfam", "clan", "boh", "abbr", "name"), 
+#            show_col_types = FALSE) %>% 
+#   select(-name, -clan, -boh)
+# 
+# long_CATH_df <- CATH_df %>% 
+#   # filter(target %in% unique(blast$query)) %>% 
+#   mutate(Gene3D=strsplit(Gene3D, ";")) %>% 
+#   unnest(Gene3D) %>% 
+#   separate(col = Gene3D, into = c("C", "A", "T", "H"), sep = "\\.", remove = FALSE) %>% 
+#   mutate(CA = paste(C,A,sep = "."), CAT=paste(C,A,T,sep = ".")) %>% 
+#   left_join(nms, by=c("C"="Gene3D")) %>%  
+#   left_join(nms, by=c("CA"="Gene3D"), suffix = c("_C", "_CA")) %>% 
+#   left_join(nms, by=c("CAT"="Gene3D"), suffix = c("_CA", "_CAT")) %>% 
+#   left_join(nms, by=c("Gene3D"), suffix = c("_CAT", "_CATH"))
+# 
+# long_CATH_nms <- long_CATH_df %>%
+#     select(-c(Entry, Pfam, n_Pfam_domains, target, n_3d_domains)) %>% 
+#     distinct()
 ```
 
 ## Fig1
@@ -273,13 +252,13 @@ fig1a <- df %>%
                              .default = singleton)) %>%
   ggplot(aes(singleton, n, fill=singleton)) +
   geom_bar(aes(alpha=Filtering), stat = "identity", position = position_dodge2(reverse=TRUE)) +
-  geom_text(aes(group=Filtering, label=paste0(round(prop, 2)*100, "%")),
-            position = position_dodge2(reverse = TRUE, width = 0.9),
-            vjust=1.3, color="white", size=3) +
+  # geom_text(aes(group=Filtering, label=paste0(round(prop, 2)*100, "%")),
+  #           position = position_dodge2(reverse = TRUE, width = 0.9),
+  #           vjust=1.3, color="white", size=3) +
   scale_fill_manual(values = palette_singleton_s, guide="none") +
   scale_alpha_manual(values = c(1,.6)) +
   scale_y_continuous(expand = c(0,0), labels = scales::label_number(scale = 1e-6)) +
-  labs(fill="Class", x="Class", y="# aligned protein pairs (Mln)") +
+  labs(fill="Class", x="Class", y="Milions of aligned protein pairs") +
   theme(legend.position = "bottom", legend.box="vertical")
 
 fig1b <- lddt_df %>% 
@@ -292,8 +271,8 @@ fig1b <- lddt_df %>%
         axis.text.y = element_blank(),
         axis.line.y = element_blank())
 
-ggsave("draft/figures/fig1_lddt.pdf", fig1b, width = 3, height = 4)
-ggsave("draft/figures/fig1_cnts.pdf", fig1a, width = 4, height = 2)
+# ggsave("draft/figures/fig1_lddt.pdf", fig1b, width = 3, height = 4)
+# ggsave("draft/figures/fig1_cnts.pdf", fig1a, width = 4, height = 2)
 ```
 
 ## Fig2
@@ -380,24 +359,66 @@ plddt_p <- df %>%
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank())
 
-df_multi <- df_filt %>% 
-  select(query, target, singleton) %>% 
-    head(n = 1000) %>%
-  left_join(CATH_df, by=c("query"="target")) %>% 
-  filter(!is.na(Pfam), !is.na(Gene3D)) %>% 
-  left_join(CATH_df, by="target") %>% 
-  rowwise() %>% 
-  mutate(Gene3D.x=strsplit(Gene3D.x, ";"),
-         Pfam.x=strsplit(Pfam.x, ";"),
-         Gene3D.y=strsplit(Gene3D.y, ";"),
-         Pfam.y=strsplit(Pfam.y, ";")) %>% 
-  mutate(n_3d_common=length(intersect(Gene3D.x,Gene3D.y)),
-         n_Pfam_common=length(intersect(Pfam.x,Pfam.y))) %>% 
-  # filter(n_Pfam_common>0, n_3d_common>0) %>% 
-  select(-c(Pfam.x,Pfam.y,Gene3D.x,Gene3D.y)) %>% 
-  mutate(Jaccard_3d=n_3d_common/pmax(n_3d_domains.x,n_3d_domains.y),
-         Jaccard_Pfam=n_Pfam_common/pmax(n_Pfam_domains.x,n_Pfam_domains.y)) %>% 
-  select(query, target, singleton, contains("Jaccard"), contains("common"))
+dbs <- colnames(ortho_dbs)[2:dim(ortho_dbs)[2]]
+# Loop through each column name and apply a function
+jaccard_df <- map_dfr(dbs, ~ {
+  col_name <- .x
+select(df_filt, query, target, singleton) %>% 
+    # filter(query=="AF-A0A024RBG1-F1") %>%
+    left_join(select(ortho_dbs, target, col_name), by=c("query"="target")) %>% 
+    left_join(select(ortho_dbs, target, col_name), by=c("target")) %>% 
+    rename("query_set"=paste0(col_name, ".x"), "target_set"=paste0(col_name, ".y")) %>% 
+    # Exclude queries without any domain
+    filter(!is.na(query_set), !is.na(target_set)) %>% 
+    group_by(query, singleton) %>%
+    distinct(query, singleton, query_set, target_set) %>% 
+    summarise(set_q = strsplit(paste(query_set, collapse = ""), ";"),
+              set_t = strsplit(paste(target_set, collapse = ""), ";")) %>%
+    rowwise() %>%
+    mutate(jaccard = length(intersect(set_q, set_t))/length(union(set_q, set_t))) %>% 
+    select(-set_q, -set_t) %>% 
+    mutate(db=col_name)
+
+})
+
+ggplot(jaccard_df, aes(jaccard, fill=singleton)) +
+  geom_histogram(position = "dodge") +
+  facet_wrap(~db, scales = "free_y") +
+  scale_y_continuous(expand = expansion(0.01,0)) + 
+  scale_fill_manual(values=palette_singleton_p) +
+  theme_bw() +
+  theme(legend.position = "top",
+        # panel.background = element_rect(fill=NA, color="black"),
+        # axis.line = element_blank()
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(), 
+        strip.background = element_rect(fill=NA)
+        # panel.grid.major.x = element_line()
+        )
+
+ggsave("test/bench.pdf", width = 8, height = 5, device = cairo_pdf)
+# plot_dbs_list[[db]] <- p_db
+
+
+
+# df_multi <- df_filt %>% 
+#   select(query, target, singleton) %>% 
+#     head(n = 100) %>%
+#   left_join(CATH_df, by=c("query"="target")) %>% 
+#   filter(!is.na(Pfam), !is.na(Gene3D)) %>% 
+#   left_join(CATH_df, by="target") %>% 
+#   rowwise() %>% 
+#   mutate(Gene3D.x=strsplit(Gene3D.x, ";"),
+#          Pfam.x=strsplit(Pfam.x, ";"),
+#          Gene3D.y=strsplit(Gene3D.y, ";"),
+#          Pfam.y=strsplit(Pfam.y, ";")) %>% 
+#   mutate(n_3d_common=length(intersect(Gene3D.x,Gene3D.y)),
+#          n_Pfam_common=length(intersect(Pfam.x,Pfam.y))) %>% 
+#   # filter(n_Pfam_common>0, n_3d_common>0) %>% 
+#   select(-c(Pfam.x,Pfam.y,Gene3D.x,Gene3D.y)) %>% 
+#   mutate(Jaccard_3d=n_3d_common/pmax(n_3d_domains.x,n_3d_domains.y),
+#          Jaccard_Pfam=n_Pfam_common/pmax(n_Pfam_domains.x,n_Pfam_domains.y)) %>% 
+#   select(query, target, singleton, contains("Jaccard"), contains("common"))
 
 
 CATH_plot <- df_multi %>% 

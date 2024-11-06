@@ -30,7 +30,12 @@ rule all:
         # expand(data_dir+'{code}/pae', code=codes),
         # expand(data_dir+'{code}/confidence', code=codes),
         expand(data_dir+'structures/{code}/low_cif', code=codes),
-        expand(data_dir+'structures/{code}/high_cif', code=codes)
+        expand(data_dir+'structures/{code}/high_cif', code=codes),
+        expand(data_dir+'gffs/{code}.gff', code=codes),
+        expand(data_dir+'cath/{code}_cath.tsv', code=codes),
+        expand(data_dir+'ids/{code}_ids.tsv', code=codes),
+        expand(data_dir+'ids/{code}_3ds.tsv', code=codes),
+        data_dir+'meta/'+config["homology_dataset"]+'_uniprot_genomes.tsv'
 
 
 rule download_pdbs:
@@ -124,3 +129,42 @@ for struct in {input.conf}/*json.gz; do
     fi
 done
 '''
+
+rule download_up_meta:
+    input: sps=config["taxids"]
+    output: data_dir+'meta/'+config["homology_dataset"]+'_uniprot_genomes.tsv'
+    shell: '''
+wget https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/STATS -O - | \
+tail -n +16 | sed 's/ //' | csvtk join -t -f "Tax_ID,Proteome_ID" {input.sps} - | cut -f1,2,3,7,9 | \
+taxonkit reformat -I 2 -f "{{k}}\\t{{p}}\\t{{c}}\\t{{o}}\\t{{f}}\\t{{g}}\\t{{s}}" | awk 'NR>1' | \
+csvtk add-header -t -n Proteome_ID,Tax_ID,mnemo,Assembly,Species_name,Kingdom,Phylum,Class,Order,Family,Genus,Species > {output}
+'''
+
+
+rule get_gff:
+    output: data_dir+'gffs/{code}.gff'
+    shell: '''
+wget "https://rest.uniprot.org/uniprotkb/stream?format=gff&query=%28%28proteome%3A{wildcards.code}%29%29" \
+-O /dev/stdout | awk 'NF' > {output}  
+'''
+
+rule get_CATH:
+    output: data_dir+'cath/{code}_cath.tsv'
+    shell: '''
+wget "https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cxref_pfam%2Cxref_gene3d&format=tsv&query=%28%28proteome%3A{wildcards.code}%29%29" -O {output}  
+'''
+
+rule get_phygeno:
+    output: data_dir+'ids/{code}_ids.tsv'
+    shell: '''
+wget "https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cxref_genetree%2Cxref_hogenom%2Cxref_inparanoid%2Cxref_phylomedb%2Cxref_orthodb%2Cxref_oma%2Cxref_treefam%2Cxref_eggnog&format=tsv&query=%28%28proteome%3A{wildcards.code}%29%29" \
+-O {output}  
+'''
+
+rule get_3Ds:
+    output: data_dir+'ids/{code}_3ds.tsv'
+    shell: '''
+wget "https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cid%2Cxref_pdb%2Cxref_emdb%2Cxref_bmrb%2Cxref_alphafolddb%2Cxref_pcddb%2Cxref_pdbsum%2Cxref_smr%2Cxref_sasbdb&format=tsv&query=%28proteome%3A{wildcards.code}%29" \
+-O {output}  
+'''
+

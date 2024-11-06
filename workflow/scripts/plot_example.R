@@ -18,7 +18,6 @@ taxmap <- read_delim(snakemake@input[["taxidmap"]],
                        show_col_types = FALSE), by = "Tax_ID") %>% 
   dplyr::select(label, Proteome_ID, mnemo)
 
-
 sptree <- read.tree(snakemake@input[["sptree"]])
 translate <- deframe(distinct(dplyr::select(taxmap, Proteome_ID, mnemo)))
 sptree$tip.label <- names(translate)[match(translate, sptree$tip.label)]

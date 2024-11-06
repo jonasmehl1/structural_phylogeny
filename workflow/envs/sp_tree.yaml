@@ -2,9 +2,10 @@ channels:
   - bioconda
   - conda-forge
 dependencies:
-  - gxx
-  - hmmer
+  # - gxx
+  # - hmmer
   - iqtree
   - mafft
-  - quicktree
+  - fastme
   - trimal
+  - foldmason

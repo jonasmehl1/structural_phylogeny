@@ -1,5 +1,3 @@
-# outdir=config['outdir']+config['dataset']
-
 rule make_blastdb:
     input:
         fa=expand(config['data_dir']+'fastas/{code}.fa', code=codes),
@@ -19,7 +17,7 @@ makeblastdb -in {output.fa} -out $out_file -parse_seqids -taxid_map {output.mapi
 rule make_taxidmap_sp:
     input:
         taxid=rules.make_blastdb.output.mapid,
-        table=rules.get_taxon_file.output
+        table=config['data_dir']+'meta/'+config["homology_dataset"]+'_uniprot_genomes.tsv'
     output: outdir+"/db/taxidmap_sps"
     conda: "../envs/sp_utils.yaml"
     shell:'''
@@ -54,7 +52,7 @@ rule blast:
     input:
         q=config['data_dir']+'fastas/{seed}.fa',
         db=rules.make_blastdb.output.blast,
-    output: outdir+"/homology/{seed}_blast.tsv"
+    output: outdir+"/{seed}_blast.tsv"
     params: config['target_seqs']
     benchmark: outdir+"/benchmarks/homology/{seed}_blast.txt"
     threads: 24
@@ -65,6 +63,16 @@ blastp -query {input.q} -db $dbfile -out {output} -max_hsps 1 -max_target_seqs {
 -outfmt "6 std qcovs qcovhsp qlen slen staxids" -num_threads {threads}
 '''
 
+rule filter_blast:
+    input: rules.blast.output
+    output: outdir+"/{seed}_blast_filtered.tsv"
+    params: 
+        eval_both=config['eval_both'],
+        coverage=config['coverage'],
+        max_seqs=config['max_seqs']
+    shell: """
+awk '$11<{params.eval_both} && $4/$15*100>{params.coverage} && $4/$16*100>{params.coverage}' {input} > {output}    
+"""
 
 rule blast_allvall:
     input:
@@ -73,8 +81,8 @@ rule blast_allvall:
         q_db=outdir+"/db/single_dbs/{seed}.pdb",
         t_db=outdir+"/db/single_dbs/{code}.pdb",
     output: 
-        q_t=outdir+"/homology/allvall/{seed}_{code}_blast.tsv",
-        t_q=outdir+"/homology/allvall/{code}_{seed}_blast.tsv"
+        q_t=outdir+"/allvall/{seed}_{code}_blast.tsv",
+        t_q=outdir+"/allvall/{code}_{seed}_blast.tsv"
     params: config['max_seqs_brh']
     benchmark: outdir+"/benchmarks/homology/{code}_{seed}_blast.txt"
     threads: 4
@@ -91,30 +99,21 @@ blastp -query {input.t} -db $dbfile2 -out {output.t_q} \
 
 rule blast_brh:
     input: 
-        a=expand(outdir+"/homology/allvall/{seed}_{code}_blast.tsv", seed=config['seed'], code=codes),
-        b=expand(outdir+"/homology/allvall/{code}_{seed}_blast.tsv", seed=config['seed'], code=codes)
-    output: outdir+"/homology/{seed}_blast_brh.tsv"
+        a=expand(outdir+"/allvall/{seed}_{code}_blast.tsv", seed=config['seed'], code=codes),
+        b=expand(outdir+"/allvall/{code}_{seed}_blast.tsv", seed=config['seed'], code=codes)
+    output: outdir+"/{seed}_blast_brh.tsv"
     params: config['eval_brh']
     conda: "../envs/sp_python.yaml"
     script: "../scripts/get_BRH.py"
 
-rule get_seqs_aa:
-    input: 
-        ids=outdir+"/seeds/{seed}/{i}/{i}_{mode}.ids",
-        fa=rules.make_blastdb.output.fa
-    output: outdir+"/seeds/{seed}/{i}/{i}_{mode}_aa.seqs",
+
+rule gene_map:
+    input:
+        table=config['data_dir']+'meta/'+config["homology_dataset"]+'_uniprot_genomes.tsv',
+        taxidmap=rules.make_blastdb.output.mapid
+    output:
+        outdir+"/db/gene_species.map"
     conda: "../envs/sp_utils.yaml"
     shell:'''
-seqkit grep -f {input.ids} {input.fa} > {output}
-'''
-
-rule aln_aa:
-    input: rules.get_seqs_aa.output
-    output: outdir+"/seeds/{seed}/{i}/{i}_{mode}_aa.alg"
-    log: outdir+"/log/mafft/{seed}_{i}_{mode}_aa.log"
-    benchmark: outdir+"/benchmarks/mafft/{seed}_{i}_{mode}_aa.txt"
-    threads: 4
-    conda: "../envs/sp_tree.yaml"
-    shell:'''
-mafft --auto --thread {threads} {input} > {output} 2> {log}
+csvtk join -H -t -f 2 -L {input.taxidmap} {input.table} | cut -f1,4 > {output}
 '''

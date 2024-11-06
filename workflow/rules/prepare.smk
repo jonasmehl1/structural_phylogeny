@@ -1,4 +1,4 @@
-outdir=config['outdir']+config['dataset']
+outdir=config['outdir']+'homology/'+config['homology_dataset']
 
 input_table = pd.read_csv(config['taxids'], sep='\t')
 input_table.columns = ['uniprot', 'taxid', 'mnemo']
@@ -6,24 +6,6 @@ input_dict = input_table.set_index('uniprot').T.to_dict()
 
 codes = list(input_table['uniprot'])
 
-rule download_up_meta:
-    output: outdir+'/meta/uniprot_genomes.tsv'
-    shell: '''
-wget https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/STATS -O - | \
-tail -n +16 | sed 's/ //' > {output}
-'''
-
-rule get_taxon_file:
-    input:
-        up=rules.download_up_meta.output,
-        sps=config["taxids"]
-    output: outdir+'/meta/'+config["dataset"]+'_uniprot_genomes.tsv'
-    conda: "../envs/sp_utils.yaml"
-    shell: '''
-csvtk join -t -f "Tax_ID,Proteome_ID" {input.sps} {input.up} | cut -f1,2,3,7,9 | \
-taxonkit reformat -I 2 -f "{{k}}\\t{{p}}\\t{{c}}\\t{{o}}\\t{{f}}\\t{{g}}\\t{{s}}" | awk 'NR>1' | \
-csvtk add-header -t -n Proteome_ID,Tax_ID,mnemo,Assembly,Species_name,Kingdom,Phylum,Class,Order,Family,Genus,Species > {output}
-'''
 
 rule get_nums:
     input: 
@@ -62,22 +44,4 @@ rule make_taxidmap:
 grep ">" {input} | sed 's/>//' | awk '{{print $0"\\t"{params.taxid}}}' > {output}
 '''
 
-rule get_gff:
-    output: config['data_dir']+'gffs/{code}.gff'
-    shell: '''
-wget "https://rest.uniprot.org/uniprotkb/stream?format=gff&query=%28%28proteome%3A{wildcards.code}%29%29" \
--O /dev/stdout | awk 'NF' > {output}  
-'''
 
-rule get_CATH:
-    output: config['data_dir']+'cath/{code}_cath.tsv'
-    shell: '''
-wget "https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cxref_pfam%2Cxref_gene3d&format=tsv&query=%28%28proteome%3A{wildcards.code}%29%29" -O {output}  
-'''
-
-rule get_phygeno:
-    output: config['data_dir']+'ids/{code}_ids.tsv'
-    shell: '''
-wget "https://rest.uniprot.org/uniprotkb/stream?fields=accession%2Cid%2Cxref_genetree%2Cxref_hogenom%2Cxref_inparanoid%2Cxref_phylomedb%2Cxref_orthodb%2Cxref_oma%2Cxref_treefam%2Cxref_eggnog&format=tsv&query=%28%28proteome%3A{wildcards.code}%29%29" \
--O {output}  
-'''
