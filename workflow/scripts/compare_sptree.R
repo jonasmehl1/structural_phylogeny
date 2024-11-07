@@ -121,4 +121,4 @@ reco_plot <- (plot_rf | plot_apro | plot_DL) +
   plot_layout(guides = "collect") &
   theme(legend.position = "bottom") 
 
-ggsave(snakemake@output[["reco"]], reco_plot, width = 7, height = 4)
+ggsave(snakemake@output[["reco"]], reco_plot, width = 8, height = 4)

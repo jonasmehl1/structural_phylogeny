@@ -47,7 +47,9 @@ rule struct_tmp_db:
 mkdir -p {output}
 
 for id in $(cat {input}); do
-zcat {params}*/high_cif/${{id}}-model_v4.cif.gz > {output}/${{id}}.cif
+    if [ -f {params}*/high_cif/${{id}}-model_v4.cif.gz ]; then
+        zcat {params}*/high_cif/${{id}}-model_v4.cif.gz > {output}/${{id}}.cif
+    fi
 done
 '''
 
@@ -279,7 +281,7 @@ rule fastme:
     threads: 4
     conda: "../envs/sp_tree.yaml"
     shell:'''
-fastme -i {input} -T {threads} -p -b {params} -o {output} > {log}
+fastme -q -p -T {threads} -b {params} -i {input} -o {output} > {log}
 rm {input}_fastme*
 '''
 

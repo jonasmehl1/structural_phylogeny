@@ -1,7 +1,7 @@
 results/
 .snakemake/
 test/
-launch_struct.sh
+launch_*.sh
 *Rproj*
 *Rhistory
 data/fastas/

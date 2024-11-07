@@ -75,9 +75,6 @@ snakemake --configfile config/test.yaml -p -j2 -k --sdm conda
 # TODOs
 
 * Run OMA benchmark at eukaryotic level and compute TCS and our metrics: https://github.com/DessimozLab/fold_tree?tab=readme-ov-file#benchmarking-experiments YOU HAVE A PROPER CONDA ENVIRONMENT NAMED foldtree TO DO THIS! (Ran on my workstation as you need internet)
-* Agree on final set of models
-* Check that everything is alright in the two test seeds. 
-* Do a proper eggnog and oma benchmark
 * Correlation between RF and average pLDDT of a tree
 
 * Why DL is different in union and foldseek
@@ -85,6 +82,9 @@ snakemake --configfile config/test.yaml -p -j2 -k --sdm conda
 
 # DONE
 
+* Check that everything is alright in the two test seeds. 
+* Do a proper eggnog and oma benchmark
+* Agree on final set of models
 * check overlap of blast and foldseek sets with various orthologous sets
 * Better representation of CATH and Pfam analysis
 * Switch from quicktree to FastME

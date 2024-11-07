@@ -205,6 +205,17 @@ ortho_dbs <- read_delim(paste0(params$data_dir, "ids/", tax$Proteome_ID, "_ids.t
 
 ortho_dbs <- full_join(CATH_df, ortho_dbs)
 
+# ortho_dbs %>% 
+#   left_join(taxmap, by=c("target"="label")) %>% 
+#   group_by(mnemo) %>% 
+#   summarise_all(~ sum(is.na(.))/nrow(ortho_dbs)) %>% 
+#   filter(!is.na(mnemo)) %>% 
+#   select(-target) %>% 
+#   pivot_longer(!mnemo) %>% 
+#   ggplot(aes(name, value)) + 
+#   geom_boxplot() + 
+#   labs(x="DB", y="% NA")
+
 # nms <- read_delim("resources/cath-names.txt", 
 #                   comment = "#", delim = "    ",
 #                   col_names = c("Gene3D", "abbr", "name"), 
@@ -360,10 +371,81 @@ plddt_p <- df %>%
         axis.ticks.y = element_blank())
 
 dbs <- colnames(ortho_dbs)[2:dim(ortho_dbs)[2]]
+dbs <- setdiff(dbs, c("InParanoid"))
+dbs <- dbs[1:5]
+
+binwidth <- 0.1
+
 # Loop through each column name and apply a function
+jaccard_df_mono <- map_dfr(dbs, ~ {
+  col_name <- .x
+  select(df_filt, query, target, singleton) %>% 
+    left_join(select(ortho_dbs, target, col_name), by=c("query"="target")) %>% 
+    left_join(select(ortho_dbs, target, col_name), by=c("target")) %>% 
+    rename("query_set"=paste0(col_name, ".x"), "target_set"=paste0(col_name, ".y")) %>% 
+    mutate(n_domain_q = str_count(pattern = "\\;", query_set),
+           n_domain_t = str_count(pattern = "\\;", target_set)) %>% 
+    filter(n_domain_q==1) %>% 
+    # Exclude queries without any domain
+    filter(!is.na(query_set), !is.na(target_set)) %>% 
+    mutate(is_same = query_set==target_set) %>% 
+    group_by(query, singleton) %>%
+    summarise(jaccard=sum(is_same)/n()) %>% 
+    # select(-set_q, -set_t) %>% 
+    mutate(db=col_name)
+
+})
+
+
+p_dbs_mono <- ggplot(jaccard_df_mono, aes(jaccard, fill=singleton)) +
+  geom_histogram(aes(group=singleton, y=after_stat(binwidth*density)), 
+                 position = "dodge", binwidth = binwidth) +
+  facet_wrap(~db, ncol = 5) +
+  scale_y_continuous(expand = expansion(0.01,0)) + 
+  scale_fill_manual(values=palette_singleton_p) +
+  theme_bw(base_family = "Aptos") +
+  labs(title="Only monodomain", x="Jaccard Index", y="Scaled density", fill="Target sets") +
+  theme(legend.position = "none",
+        strip.background = element_rect(fill=NA))
+
+
+# Loop through each column name and apply a function
+jaccard_df_NA <- map_dfr(dbs, ~ {
+  col_name <- .x
+  select(df_filt, query, target, singleton) %>% 
+    # filter(query=="AF-A0A024RBG1-F1") %>%
+    left_join(select(ortho_dbs, target, col_name), by=c("query"="target")) %>% 
+    left_join(select(ortho_dbs, target, col_name), by=c("target")) %>% 
+    rename("query_set"=paste0(col_name, ".x"), "target_set"=paste0(col_name, ".y")) %>% 
+    # Exclude queries without any domain
+    filter(!is.na(query_set)) %>% 
+    group_by(query, singleton) %>%
+    distinct(query, singleton, query_set, target_set) %>% 
+    summarise(set_q = strsplit(paste(query_set, collapse = ""), ";"),
+              set_t = strsplit(paste(target_set, collapse = ""), ";")) %>%
+    rowwise() %>%
+    mutate(jaccard = length(intersect(set_q, set_t))/length(union(set_q, set_t))) %>% 
+    select(-set_q, -set_t) %>% 
+    mutate(db=col_name)
+
+})
+
+
+p_dbs_NA <- ggplot(jaccard_df_NA, aes(jaccard, fill=singleton)) +
+  geom_histogram(aes(group=singleton, y=after_stat(binwidth*density)), 
+                 position = "dodge", binwidth = binwidth) +
+  facet_wrap(~db, ncol = 5) +
+  scale_y_continuous(expand = expansion(0.01,0)) + 
+  scale_fill_manual(values=palette_singleton_p) +
+  theme_bw(base_family = "Aptos") +
+  labs(title="NA=mismatch", x="Jaccard Index", y="Scaled density", fill="Target sets") +
+  theme(legend.position = "none",
+        strip.background = element_rect(fill=NA))
+
+
 jaccard_df <- map_dfr(dbs, ~ {
   col_name <- .x
-select(df_filt, query, target, singleton) %>% 
+  select(df_filt, query, target, singleton) %>% 
     # filter(query=="AF-A0A024RBG1-F1") %>%
     left_join(select(ortho_dbs, target, col_name), by=c("query"="target")) %>% 
     left_join(select(ortho_dbs, target, col_name), by=c("target")) %>% 
@@ -381,23 +463,21 @@ select(df_filt, query, target, singleton) %>%
 
 })
 
-ggplot(jaccard_df, aes(jaccard, fill=singleton)) +
-  geom_histogram(position = "dodge") +
-  facet_wrap(~db, scales = "free_y") +
+
+p_dbs <- ggplot(jaccard_df, aes(jaccard, fill=singleton)) +
+  geom_histogram(aes(group=singleton, y=after_stat(binwidth*density)), 
+                 position = "dodge", binwidth = binwidth) +
+  facet_wrap(~db, ncol = 5) +
   scale_y_continuous(expand = expansion(0.01,0)) + 
   scale_fill_manual(values=palette_singleton_p) +
-  theme_bw() +
+  theme_bw(base_family = "Aptos") +
+  labs(title="Default", x="Jaccard Index", y="Scaled density", fill="Target sets") +
   theme(legend.position = "top",
-        # panel.background = element_rect(fill=NA, color="black"),
-        # axis.line = element_blank()
-        axis.text.y = element_blank(),
-        axis.ticks.y = element_blank(), 
-        strip.background = element_rect(fill=NA)
-        # panel.grid.major.x = element_line()
-        )
+        strip.background = element_rect(fill=NA))
 
-ggsave("test/bench.pdf", width = 8, height = 5, device = cairo_pdf)
-# plot_dbs_list[[db]] <- p_db
+p_dbs / p_dbs_NA / p_dbs_mono
+
+# ggsave("test/bench.pdf", p_dbs, width = 8, height = 5, device = cairo_pdf)
 
 
 

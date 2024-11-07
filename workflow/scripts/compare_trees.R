@@ -26,15 +26,18 @@ df_ml <- read_delim(snakemake@input[["mltrees"]], delim = "\t",
 
 # Disco similarity to sptree
 disco_fls <- c(snakemake@input[["disco"]])
+# disco_fls <- list.files("results/phylogeny/eggnog_benchmark/reco/disco/", full.names = T, pattern = "out*")
 
 # Astral-pro results
 clades <- read_delim(snakemake@input[["table"]], show_col_types = FALSE)
 
 apro_files <- snakemake@input[["apro_trees"]]
+# apro_files <- list.files("results/phylogeny/eggnog_benchmark/reco/apro/", full.names = T, pattern = "supp*")
+apro_files <- apro_files[sapply(apro_files, function(x) file.size(x))>0]
+
 apro_trees <- read.tree(text = sapply(apro_files, readLines))
 names(apro_trees) <- sapply(str_split(basename(apro_files), "_"), 
                             function(x) paste0(x[2], "_", x[4]))
-
 
 # 1. Compute astral-pro quartet
 nodes_clades <- fortify(sptree) %>% 
@@ -210,7 +213,7 @@ rf_plot <- rf_df %>%
 
 
 # Reconciliation notung
-reco <- read_delim(snakemake@input[["reco"]], 
+reco <- read_delim("results/phylogeny/eggnog_benchmark/reco/UP000005640_notung.tsv", 
                      show_col_types = FALSE, col_names = c("gene", "dups", "losses")) %>% 
   separate(gene, c("gene", "target", "alphabet", "model")) %>% 
   left_join(var_df) %>% 

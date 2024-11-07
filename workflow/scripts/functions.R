@@ -10,9 +10,11 @@ fs_columns <- c("query","target","pident","length","mismatch","gapopen",
                 "qstart","qend","sstart","send","evalue","bitscore",
                 "lddt","alntmscore","rmsd","prob","qcov","tcov")
 
-models <- c("LG", "FM", "FT", "FTPY", "3Di", "GTR", "AF", "LLM")
+models <- c("LG", "FM", "FT", "FTPY", 
+            "3Di", "GTR", "AF", "LLM", "part")
 
-palettes_model <- c("#BF360C", "#FFA000", "#D4E157","#646B00", "#75C323", "#40A79D", "#33ceff", "#3396ff")
+palettes_model <- c("#BF360C", "#FFA000", "#D4E157","#646B00",
+                    "#75C323", "#40A79D", "#33ceff", "#3396ff", "purple")
 names(palettes_model) <- models
 palettes_model_d <- colorspace::darken(palettes_model, amount = 0.6)
 names(palettes_model_d) <- models
