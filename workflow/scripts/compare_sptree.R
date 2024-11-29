@@ -117,8 +117,31 @@ plot_rf <- disco_rf %>%
   labs(x="", y="Norm. RF to species tree (only if > 10 tips)", fill="Target sets")  +
   theme(legend.position = "none")
 
-reco_plot <- (plot_rf | plot_apro | plot_DL) + 
+rank_plot <- reco %>% 
+  group_by(gene, target) %>% 
+  mutate(rank = factor(dense_rank(n_events), levels = seq(0,9,0.5))) %>% 
+  ggplot(aes(rank, fill=model, alpha=target)) +
+  # geom_bar(position = "dodge") + 
+  geom_histogram(stat="count", position = "dodge") +
+  # facet_grid(target~.) +
+  scale_y_continuous(expand = expansion(c(0,0))) +
+  scale_fill_manual(values = palettes_model) + 
+  scale_alpha_manual(values = seq(1, 0.3, length.out=4))
+
+reco_plot <- ((plot_rf | plot_apro | plot_DL) / (rank_plot)) + 
   plot_layout(guides = "collect") &
   theme(legend.position = "bottom") 
 
-ggsave(snakemake@output[["reco"]], reco_plot, width = 8, height = 4)
+ggsave(snakemake@output[["reco"]], reco_plot, width = 8, height = 6)
+
+
+# nodes_df %>% 
+#   group_by(node, target) %>% 
+#   mutate(rank = factor(dense_rank(-q1), levels = seq(0,9,0.5))) %>% 
+#   ggplot(aes(rank, fill=model, alpha=target)) +
+#   geom_histogram(stat="count", position = "dodge") +
+#   # facet_grid(target~.) +
+#   scale_y_continuous(expand = expansion(c(0,0))) +
+#   scale_fill_manual(values = palettes_model) + 
+#   scale_alpha_manual(values = seq(1, 0.3, length.out=4))
+

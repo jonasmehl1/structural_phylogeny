@@ -10,10 +10,10 @@ fs_columns <- c("query","target","pident","length","mismatch","gapopen",
                 "qstart","qend","sstart","send","evalue","bitscore",
                 "lddt","alntmscore","rmsd","prob","qcov","tcov")
 
-models <- c("LG", "FM", "FT", "FTPY", 
+models <- c("LG", "FM", "QT",  "FT", "FTPY", 
             "3Di", "GTR", "AF", "LLM", "part")
 
-palettes_model <- c("#BF360C", "#FFA000", "#D4E157","#646B00",
+palettes_model <- c("#BF360C", "#FFA000", "#FFA000", "#D4E157","#646B00",
                     "#75C323", "#40A79D", "#33ceff", "#3396ff", "purple")
 names(palettes_model) <- models
 palettes_model_d <- colorspace::darken(palettes_model, amount = 0.6)
@@ -22,7 +22,8 @@ names(palettes_model_d) <- models
 
 palettes_method <- c("#00A08A", "#d63a3a", "#ffaa0e", "#6f63bb")
 names(palettes_method) <- c("common", "blast", "fs", "union")
-
+palettes_method_d <- colorspace::darken(palettes_method, amount = 0.3)
+names(palettes_method_d) <- c("common", "blast", "fs", "union")
 palette_singleton <- c("#00A08A", "#d63a3a", "#ffaa0e", "#6f63bb")
 names(palette_singleton) <- c("common", "only_blast", "only_fs", "union")
 

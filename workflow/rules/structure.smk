@@ -55,6 +55,7 @@ foldseek easy-search {input.q} {input.db} {output} $TMPDIR/{wildcards.seed} --th
 --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > {log}
 sed -i 's/-model_v4.cif//g' {output}
 '''
+# foldseek results are sorted by bitScore * sqrt(alnlddt * alntmscore) https://github.com/steineggerlab/foldseek/issues/85
 
 rule filter_foldseek:
     input: rules.foldseek.output

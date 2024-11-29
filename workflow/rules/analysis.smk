@@ -10,7 +10,7 @@ rule plot_blens:
     input:
         blast=homodir+"/{seed}_blast.tsv",
         fs=homodir+"/{seed}_fs.tsv",
-        trees=rules.get_unrooted_trees.output.trees
+        trees=rules.get_unrooted_trees.output
     params: 
         eval_both=config['eval_both'],
         coverage=config['coverage'],
@@ -43,7 +43,7 @@ rule get_examples_report:
 
 rule plot_examples:
     input: 
-        trees=rules.get_unrooted_trees.output.trees,
+        trees=rules.get_unrooted_trees.output,
         ids=rules.get_examples_ids.output,
         taxidmap=homodir+"/db/taxidmap",
         reco=rules.merge_Notung.output,
@@ -69,7 +69,7 @@ cut -f2,3 {input} | taxonkit reformat -I 1 | sed 's/;/,/g' | awk 'NR>1' > {outpu
 
 # rule get_verticality:
 #     input: 
-#         trees=rules.get_unrooted_trees.output.trees,
+#         trees=rules.get_unrooted_trees.output,
 #         lineage=rules.get_lineage.output,
 #         taxidmap=rules.make_blastdb.output.mapid
 #         # sptree=config['species_tree']
@@ -83,7 +83,7 @@ rule support_astral_pro:
     input:
         sptree=config['species_tree'],
         genemap=homodir+"/db/gene_species.map",
-        trees=rules.get_unrooted_trees.output.trees,
+        trees=rules.get_unrooted_trees.output,
     output: 
         gt=outdir+"/reco/apro/{seed}_{mode}_{alphabet}_{model}_apro_input.nwk",
         st=outdir+"/reco/apro/{seed}_{mode}_{alphabet}_{model}_apro_support.nwk"
@@ -91,7 +91,7 @@ rule support_astral_pro:
     params: config['root']
     conda: "../envs/reco.yaml"
     shell:'''
-awk '$2=="{wildcards.mode}" && $3=="{wildcards.alphabet}" && $4=="{wildcards.model}"' {input.trees} | \
+awk '$2=="{wildcards.mode}" && $3=="{wildcards.alphabet}" && $4=="{wildcards.model}"' {input} | \
 cut -f5 > {output.gt}
 astral-pro -c {input.sptree} -a {input.genemap} -u 2 -i {output.gt} -o {output.st} -C --root {params} 2> {log}
 '''
@@ -100,7 +100,7 @@ rule disco:
     input:
         # sptree=config['species_tree'],
         genemap=homodir+"/db/gene_species.map",
-        trees=rules.get_unrooted_trees.output.trees,
+        trees=rules.get_unrooted_trees.output,
     output: 
         gt=outdir+"/reco/disco/{seed}_{mode}_{alphabet}_{model}_disco_input.nwk",
         gt_out=outdir+"/reco/disco/{seed}_{mode}_{alphabet}_{model}_disco_output.nwk"
@@ -108,7 +108,7 @@ rule disco:
     params: config['root']
     conda: "../envs/reco.yaml"
     shell:'''
-awk '$2=="{wildcards.mode}" && $3=="{wildcards.alphabet}" && $4=="{wildcards.model}"' {input.trees} | \
+awk '$2=="{wildcards.mode}" && $3=="{wildcards.alphabet}" && $4=="{wildcards.model}"' {input} | \
 cut -f5 | nw_rename - {input.genemap} > {output.gt}
 disco.py -i {output.gt} -o {output.gt_out}
 '''
@@ -190,5 +190,5 @@ rule plot_trees:
 #     output: outdir+"/plots/{seed}_astral_pro.pdf"
 #     conda: "../envs/sp_R.yaml"
 #     script: "../scripts/analyze_apro.R"
-# reco_dir=$(dirname {input.trees} | sort -u)
+# reco_dir=$(dirname {input} | sort -u)
 

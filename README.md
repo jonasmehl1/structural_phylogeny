@@ -74,14 +74,14 @@ snakemake --configfile config/test.yaml -p -j2 -k --sdm conda
 
 # TODOs
 
-* Run OMA benchmark at eukaryotic level and compute TCS and our metrics: https://github.com/DessimozLab/fold_tree?tab=readme-ov-file#benchmarking-experiments YOU HAVE A PROPER CONDA ENVIRONMENT NAMED foldtree TO DO THIS! (Ran on my workstation as you need internet)
-* Correlation between RF and average pLDDT of a tree
-
+* update README
 * Why DL is different in union and foldseek
-* implement notebook instead of scripts to plot that can take both eggnoglike or phylomedb.
 
 # DONE
 
+* implement notebook instead of scripts to plot that can take both eggnoglike or phylomedb.
+* Correlation between RF and average pLDDT of a tree
+* Run OMA benchmark at eukaryotic level and compute TCS and our metrics: https://github.com/DessimozLab/fold_tree?tab=readme-ov-file#benchmarking-experiments YOU HAVE A PROPER CONDA ENVIRONMENT NAMED foldtree TO DO THIS! (Ran on my workstation as you need internet)
 * Check that everything is alright in the two test seeds. 
 * Do a proper eggnog and oma benchmark
 * Agree on final set of models

@@ -37,7 +37,7 @@ min_lddt: 50
 
 # Ultrafast bootstrap for iqtree
 UF_boot: 1000
-# Boostrap for quicktree
+# Boostrap for fastme
 distboot: 100
 
 # files and folders

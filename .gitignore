@@ -16,3 +16,5 @@ resources/fastas/
 resources/structures/
 workflow/notebooks/*cache/
 workflow/notebooks/*files/
+workflow/notebooks/prokaryote_sampling*
+workflow/notebooks/*html
