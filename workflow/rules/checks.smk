@@ -81,7 +81,7 @@ rule merge_Notung:
     output: outdir+"/reco/{seed}_notung.tsv"
     shell: '''
 for file in {input}; do
-echo -e "$(basename $file | cut -f1,2,3,4 -d'_')\\t$(awk 'NR==1' $file | cut -f2,5)"
+echo -e "$(basename $file | cut -f1-4 -d'_' |tr '_' '\\t')\\t$(awk 'NR==1' $file | cut -f2,5)"
 done > {output}
 '''
 
