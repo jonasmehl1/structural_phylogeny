@@ -20,11 +20,11 @@ names(palettes_model) <- models
 
 df_model <- tibble(model = factor(models), 
        data = c(rep("AA", 3), "Mixed", rep("3Di", 6)),
-       algorithm = c("ML", rep("Dist.", 2), "ML", 
-                     rep("Dist.", 2), rep("ML", 4))) %>% 
+       algorithm = c("ML", rep("Distance", 2), "ML", 
+                     rep("Distance", 2), rep("ML", 4))) %>% 
   filter(!model %in% c("QT", "FTPY") )
 df_model$data <- factor(df_model$data, levels = c("AA", "Mixed", "3Di"))
-df_model$algorithm <- factor(df_model$algorithm, levels = c("ML", "Dist."))
+df_model$algorithm <- factor(df_model$algorithm, levels = c("ML", "Distance"))
 
 palettes_model_d <- colorspace::darken(palettes_model, amount = 0.6)
 names(palettes_model_d) <- models

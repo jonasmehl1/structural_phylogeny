@@ -1,12 +1,28 @@
-# Structural Phylome
+# Structural Phylome: A Tool for Structural Phylogenetic Analysis
+[![Snakemake](https://img.shields.io/badge/snakemake-≥8-brightgreen.svg)](https://snakemake.github.io)
 
-From a given taxon sampling and a given seed species compute a normal sequence based phylome and a novel structure based phylome.
+<!-- vscode-markdown-toc -->
+* 1. [Usage](#Usage)
+	* 1.1. [Installation](#Installation)
+	* 1.2. [Data preparation](#Datapreparation)
+	* 1.3. [Phylogeny pipeline](#Phylogenypipeline)
+	* 1.4. [Outputs](#Outputs)
 
-## Usage
+<!-- vscode-markdown-toc-config
+	numbering=true
+	autoSave=true
+	/vscode-markdown-toc-config -->
+<!-- /vscode-markdown-toc -->
 
-### Installation
+This repo helps running different phylogenetic analyses, including workflows based on protein structures, given some seed sequences or predefined orthogroups. It may be useful to use and benchmark new structural phylogenetics method. It is designed to be easily expandable, so feel free to contribute with code or ideas for us to include!
 
-The first thing must be installing snakemake and you can easily do this with this conda command
+The results from the first run of the pipeline are reported in this preprint: [Newly developed structure-based methods do not outperform standard sequence-based methods for large-scale phylogenomics](https://www.biorxiv.org/content/10.1101/2024.08.02.606352v1)
+
+##  1. <a name='Usage'></a>Usage
+
+###  1.1. <a name='Installation'></a>Installation
+
+First you need to install snakemake and you can easily do this with this conda command:
 
 ```
 conda create -c conda-forge -c bioconda -n snakemake snakemake hdf5 snakefmt snakedeploy
@@ -14,38 +30,48 @@ conda create -c conda-forge -c bioconda -n snakemake snakemake hdf5 snakefmt sna
 
 Then from now one I'd reccomend to manage further dependencies with conda using the `--sdm conda` flag in snakemake. Otherwise you can find in `workflow/envs/` different yaml files to recreate what is needed at each step.
 
-The only dependency not automatically managed in the pipeline is gsutil: follow these instructions for [gsutil installation](https://cloud.google.com/storage/docs/gsutil_install).
+The only dependency not automatically managed in the pipeline is gsutil: follow these instructions for [gsutil installation](https://cloud.google.com/storage/docs/gsutil_install). Gsutil is used to download full UniProt proteomes from [AlphafoldDB](https://alphafold.ebi.ac.uk/).
 
-### Data preparation
+###  1.2. <a name='Datapreparation'></a>Data preparation
 
-First of all you need to download the data, to do this you need an input file with 3 columns (Uniprot ID\tTaxid\tmnemonic), see `data/input/Test_set.txt`. You also need a config file where you can specify various parameters, see `config/test.yaml` for example. The analysis in the paper were done using `config/Hsapopi_test.yaml`.
+To run the pipeline the user will need to prepare these files:
+
+1. `metadata`: a file specifying the taxon sampling. All the protein structures and sequences from the species included in the file will be downloaded. **IMPORTANT:** the species must be present in UniProt, you can check [here](https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/README) if your species are present.
+2. `seed_file`: A file with either one column with protein IDs of the seed species or two tab separated columns `orthogroup\tprotein_id`.
+3. `species_tree`: The corresponding species tree in newick format
+4. `configfile`: A `yaml` file with different parameters
+
+The pipeline can be run in two distinct modes: *Phylome* and *OG*. For the first approach, the user only needs to input a list of protein IDs of the seed species (indicated by `seed: UniProt_id` in the `configfile`). Each protein will be aligned to the structures and sequences of the different taxas indicated in the `metadata` file. Alternatively, if the user already has defined orthogroups the homology search step is skipped and the different trees will be computed on these sets.
+
+Importantly, global parameters that are likely to be used across different datasets are in `config/params.yaml`. Note that the values in the first custom yaml are prioritary to the ones in this `params.yaml`! However, it is mandatory that the `configfile` has these fields:
+
 
 ```yaml
-# Input file
-dataset: 'example'
-taxids: 'data/input/Test_set.txt'
-species_tree: 'data/sptrees/Test.nwk'
-seed: ['UP000000625']
-root: 'ecoli'
+# these will be the prefix of the output directory in results/homology
+homology_dataset: 'hsap_euka'
+# these will be the prefix of the output directory in results/phylogeny
+phylo_dataset: 'hsap_1kseeds'
+taxids: 'data/input/Hsapopi_set.txt'
+species_tree: 'data/sptrees/homo_internal.spTree.nw'
+# the seed uniprot id
+seed: ['UP000005640']
+root: 'Atha'
 
 # this is the number of seed genes to run the pipeline
-test_seeds: 15
-n_examples: 3
+test_seeds: 'data/seeds/draft_seeds.txt'
 ```
 
-Importantly, global parameters that are likely to be used across different datasets are in `config/params.yaml`. Note that the values in the first yaml are prioritary to the ones in this last file!
-
-Once you have these you can simply run:
+Once the user has the 4 files, the data downloading can start:
 
 ```
 snakemake -s workflow/download_data.smk --configfile config/test.yaml -p -j2 --sdm conda
 ```
 
-This first pipeline is necessary to get all input files. From the input table we can download all the pdbs from google and then consider only those entries with mean average quality > `params["low_confidence"]` value. These will be moved into the `high_cif` folder for each proteome.
+This first pipeline is necessary to get all input files. From the input table we can download all the pdbs from google and then consider only those entries with mean average quality > `params["low_confidence"]` value. These proteins will be moved into the `high_cif` folder for each proteome.
 
 You can change the directory where all these data are stored with `params["data_dir"]` parameter but I would just use the default one.
 
-### Phylogeny pipeline
+###  1.3. <a name='Phylogenypipeline'></a>Phylogeny pipeline
 
 To run the actual pipeline you just need as input the species tree and the previous uniprot table file. Once you have these you can decide the target sets and the methodological implementations that you'd like to explore:
 
@@ -65,7 +91,7 @@ To run the pipeline you can simply run this command and monitor that everything 
 snakemake --configfile config/test.yaml -p -j2 -k --sdm conda
 ```
 
-### Outputs
+###  1.4. <a name='Outputs'></a>Outputs
 
 * `results/{dataset}/trees/{seed}_unrooted_trees.txt`: has 5 columns (gene ID, target set, alphabet, model and tree text). This file is easily parsable in R or Python to do further analyses. You can find some R scripts to do that in `workflow/scripts/` 
 * `results/{dataset}/plots/{seed}*pdf`: here you will find various plot that should inform you about the homology search and tree reconstruction quality.

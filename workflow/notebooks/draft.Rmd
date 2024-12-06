@@ -389,7 +389,7 @@ p_dbs <- ggplot(jaccard_df, aes(avg_Jaccard, 1, color=singleton, alpha=db)) +
   scale_y_continuous(expand = expansion(0.0,0)) +  
   scale_x_continuous(expand = expansion(add = c(0,0.01))) +  
   guides(colour = guide_legend(order = 1),  
-         alpha = guide_legend(order = 2)) +
+         alpha = guide_legend(title = "CATH Level", order = 2)) +
   theme(panel.border = element_rect(fill = NA), 
         legend.position = "bottom",
         panel.grid.major = element_line(linetype = 2)) + 
@@ -502,7 +502,7 @@ reco <- read_delim("test/flashforward/out/notung.txt",
 
 
 ```{r fig3}
-xax <- ifelse(df_model$algorithm=="Dist.", "italic", "plain")
+xax <- ifelse(df_model$algorithm=="Distance", "italic", "plain")
 
 plot_DL <- reco %>% 
   left_join(df_model) %>% 
@@ -511,7 +511,7 @@ plot_DL <- reco %>%
   labs(y="(D+L)/# Tips", x="",fill="Target sets") +
   geom_boxplot(outlier.size = .1) +
   scale_color_manual(values = c("black", "black"),
-                     labels = c("ML", expression(italic("Dist.")))) +
+                     labels = c("ML", expression(italic("Distance")))) +
   guides(x = "axis_nested", 
          colour=guide_legend(title = "Method", override.aes=list(linetype = 0, size=0))) +
   scale_fill_manual(values = palettes_method) +
@@ -533,7 +533,7 @@ plot_rf <- disco_rf %>%
   labs(x="", y="Norm. RF to species tree", fill="Target sets") +
   geom_boxplot(outlier.size = .1) +
   scale_color_manual(values = c("black", "black"),
-                     labels = c("ML", expression(italic("Dist.")))) +
+                     labels = c("ML", expression(italic("Distance")))) +
   guides(x = "axis_nested", 
          colour=guide_legend(title = "Method", override.aes=list(linetype = 0, size=0))) +
   scale_fill_manual(values = palettes_method) +
@@ -560,9 +560,10 @@ plot_apro <- trees_df %>%
   labs(x="", y="Quartet support", fill="Target sets") + 
   geom_boxplot(outlier.size = .1) +
   scale_color_manual(values = c("black", "black"),
-                     labels = c("ML", expression(italic("Dist.")))) +
+                     labels = c("ML", expression(italic("Distance")))) +
   guides(x = "axis_nested", 
-         colour=guide_legend(title = "Method", override.aes=list(linetype = 0, size=0))) +
+         colour=guide_legend(title = "Method", 
+                             override.aes=list(linetype = 0, size=0))) +
   scale_fill_manual(values = palettes_method) +
     theme(
     axis.text.x = element_text(face = xax),
@@ -579,11 +580,12 @@ fig3 <- plot_rf + plot_apro + plot_DL +
         legend.margin=margin(0,0,0,0),
         legend.box.margin=margin(-25,0,-10,0)) 
 
+
 ggsave("draft/figures/Fig3.pdf", fig3, width = 9, height = 2.8, device = cairo_pdf)
 ```
 
 
-```{r FigS1}
+```{r FigS2}
 # Compare trees with RF distance
 rf_df <- get_rf_df(df_trees)
 rf_text <- group_by(rf_df, model.x, model.y) %>% 
@@ -614,7 +616,7 @@ var_r2t <- reco %>%
 
 rf_plot <- rf_text %>% 
   ggplot(aes(model.x, model.y)) +
-  geom_tile(aes( fill=value)) +
+  geom_tile(aes(fill=value)) +
   geom_text(aes(label=round(value, 2)), color="white") +
   scale_fill_distiller(palette="YlGnBu", direction = -1, limits = c(0,1), 
                        name="Mean RF") + 
@@ -653,7 +655,7 @@ plot_dist <- df_dist %>%
   scale_fill_manual(values = palette_singleton_p) + 
   theme(legend.position = "bottom")
 
-fig_s1 <- ((plot_bs / rf_plot) + 
+fig_s2 <- ((plot_bs / rf_plot) + 
              plot_layout(heights = c(2,1)) | 
              (plot_dist / var_r2t) + 
              plot_layout(heights = c(2,1))) +
@@ -661,10 +663,10 @@ fig_s1 <- ((plot_bs / rf_plot) +
   plot_annotation(tag_levels = 'A') & 
   theme(plot.tag = element_text(size = 10, face = "bold", family = "Helvetica"))
 
-ggsave("draft/figures/Fig_S1.pdf", fig_s1, width = 10, height = 6)
+ggsave("draft/figures/Fig_S2.pdf", fig_s2, width = 10, height = 6)
 ```
 
-```{r FigS2}
+# ```{r FigS2}
 # pp1_plot <- nodes_df %>%
 #     filter(model!="FTPY") %>% 
 #     ggplot(aes(q1, label_int, fill=model, color=model, group=model)) +
@@ -700,7 +702,7 @@ ggsave("draft/figures/Fig_S1.pdf", fig_s1, width = 10, height = 6)
 #   plot_annotation(tag_levels = 'A') &
 #   theme(plot.tag = element_text(size = 10, face = "bold", family = "Helvetica"))
 # ggsave("draft/figures/figS2.pdf", fig_s2, width = 12, height = 6, device = cairo_pdf)
-```
+<!-- ``` -->
 
 # Review plots
 
