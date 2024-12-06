@@ -1,38 +1,23 @@
 # Structural Phylome: A Tool for Structural Phylogenetic Analysis
 [![Snakemake](https://img.shields.io/badge/snakemake-≥8-brightgreen.svg)](https://snakemake.github.io)
 
-<!-- vscode-markdown-toc -->
-* 1. [Usage](#Usage)
-	* 1.1. [Installation](#Installation)
-	* 1.2. [Data preparation](#Datapreparation)
-	* 1.3. [Phylogeny pipeline](#Phylogenypipeline)
-	* 1.4. [Outputs](#Outputs)
-
-<!-- vscode-markdown-toc-config
-	numbering=true
-	autoSave=true
-	/vscode-markdown-toc-config -->
-<!-- /vscode-markdown-toc -->
-
 This repo helps running different phylogenetic analyses, including workflows based on protein structures, given some seed sequences or predefined orthogroups. It may be useful to use and benchmark new structural phylogenetics method. It is designed to be easily expandable, so feel free to contribute with code or ideas for us to include!
 
 The results from the first run of the pipeline are reported in this preprint: [Newly developed structure-based methods do not outperform standard sequence-based methods for large-scale phylogenomics](https://www.biorxiv.org/content/10.1101/2024.08.02.606352v1)
 
-##  1. <a name='Usage'></a>Usage
+# Installation
 
-###  1.1. <a name='Installation'></a>Installation
-
-First you need to install snakemake and you can easily do this with this conda command:
+Install Snakemake and its dependencies using Conda:
 
 ```
 conda create -c conda-forge -c bioconda -n snakemake snakemake hdf5 snakefmt snakedeploy
 ```
 
-Then from now one I'd reccomend to manage further dependencies with conda using the `--sdm conda` flag in snakemake. Otherwise you can find in `workflow/envs/` different yaml files to recreate what is needed at each step.
+Use the --sdm conda flag with Snakemake for dependency management. Alternatively, YAML files for each workflow step are available in workflow/envs/.
 
 The only dependency not automatically managed in the pipeline is gsutil: follow these instructions for [gsutil installation](https://cloud.google.com/storage/docs/gsutil_install). Gsutil is used to download full UniProt proteomes from [AlphafoldDB](https://alphafold.ebi.ac.uk/).
 
-###  1.2. <a name='Datapreparation'></a>Data preparation
+# Data preparation
 
 To run the pipeline the user will need to prepare these files:
 
@@ -66,36 +51,72 @@ Once the user has the 4 files, the data downloading can start:
 snakemake -s workflow/download_data.smk --configfile config/test.yaml -p -j2 --sdm conda
 ```
 
-This first pipeline is necessary to get all input files. From the input table we can download all the pdbs from google and then consider only those entries with mean average quality > `params["low_confidence"]` value. These proteins will be moved into the `high_cif` folder for each proteome.
+This first pipeline is necessary to get all input files. From the input table we can download all the pdbs from google and then consider only those entries with mean average quality > `params["low_confidence"]` value. These proteins will be moved into the `high_cif` folder for each proteome. 
+
+A part from structures, this will also download different metadata for each proteome, including GFFs, CATH IDs and other metadata available in UniProt (in order to link IDs to OMA or EggNOG groups).
 
 You can change the directory where all these data are stored with `params["data_dir"]` parameter but I would just use the default one.
 
-###  1.3. <a name='Phylogenypipeline'></a>Phylogeny pipeline
+# Usage
 
-!(Main snakemake pipeline)["resources/dags/structpipe.png"]
+## Homology pipeline
 
-To run the actual pipeline you just need as input the species tree and the previous uniprot table file. Once you have these you can decide the target sets and the methodological implementations that you'd like to explore:
+![Homology pipeline](resources/dags/blast.png)
+
+First of all, if run in *Phylome* mode, we want to detect homologs with *BlastP* or *Foldseek*. Some of the parameters of the homology search tools can be modified, see the `config/params.yaml`.
+
+```
+snakemake --configfile config/example_phylome.yaml -s workflow/run_blast.smk -p -j2 -k --sdm conda
+```
+
+Interestingly, given that each UniProt entry is potentially associated to other phylogenomics databases, we can easily benchmark the performance of both tools and parameters. In this case, the general parameters will need to be here: `config/params_ortho_benchmark.yaml`
+
+```
+snakemake --configfile config/example_phylome.yaml -s workflow/ortho_benchmark.smk -p -j2 -k --sdm conda
+```
+
+## Phylogeny pipeline
+
+![Main snakemake pipeline](resources/dags/structpipe.png)
+
+Once you downloaded the data and found your homologs you can run the phylogenetic inference for the seeds/OGs specified in the `seed_file`. You can run different combinations of phylogenetic steps that can be specified in the config file:
 
 ```yaml
-combinations: ["3Di_3Di", "aa_FM_", "aa_LG", "3Di_GTR", "3Di_FT", "3Di_LLM", "3Di_AF"]
-# Subset of the first one that requires ML 
-combinations_ML: ["3Di_3Di", "aa_LG", "3Di_GTR", "3Di_LLM", "3Di_AF"]
+combinations: ["3Di_3Di", "aa_FM", "aa_LG", "3Di_GTR", "3Di_FT", "comb_part", "3Di_LLM", "3Di_AF"] #, "3Di_FTPY"]
 modes: ['blast', 'fs', 'common', 'union']
 ```
 
-Another important parameter is the `seed`. You can specify one or a list of many (although this feature is more or less untested) and the pipeline will create one output per seed species.
+The main thing is that for each seed gene there will be # modes * # combinations tree files (assuming 4 modes and 8 combinations=32 trees per seed). Therefore, this can expand quickly and you may want to explore only some specific combination of tools. The output files will be named with this pattern: `{seed}_{target_set}_{alphabet}_{model}`. The different `models` are explained in details in the [preprint](https://www.biorxiv.org/content/10.1101/2024.08.02.606352v1). 
 
-To run the pipeline you can simply run this command and monitor that everything is more or less running fine.
+* **Alignment**: 
+	* **aa**: mafft --auto + trimal -gappyout
+	* **3Di**: Foldmason + trimal -gappyout
+	* **comb**: concatenate **aa** and **3Di**
+
+* **Tree inference**:
+	* **LG**: iqtree2 -s **aa.fa** --prefix $tree_prefix -B 1000 -T {threads} --boot-trees --quiet --mem 4G --cmin 4 --cmax 10 –mset LG
+	* **FM**: fastme -q -p -T {threads} -b {params} -i **aa.phy** -o {output} > {log}
+	* **3Di**: iqtree2 -s **3Di.fa** {same as LG} –mset 3DI -mdef resources/subst_matrixes/3DI.nexus
+	* **GTR**: iqtree2 -s **3Di.fa** {same as LG} –mset GTR20
+	* **AF**: iqtree2 -s **3Di.fa** {same as LG} –mset resources/subst_matrixes/Q_mat_AF_Garg.txt
+	* **LLM**: iqtree2 -s **3Di.fa** {same as LG} –mset resources/subst_matrixes/Q_mat_LLM_Garg.txt
+	* **Part**: Create partition file with best model from **LG** and **3Di**. Then
+		iqtree2 -s **comb.fa** -p {input.part} --prefix $tree_prefix -mdef resources/subst_matrixes/3DI.nexus -B 1000 -T {threads}
+	* **FT**: foldseek easy-search $structdir $structdir {output} $TMPDIR --format-output 'query,target,fident,lddt,alntmscore' --exhaustive-search -e inf; foldseekres2distmat_simple.py; quicktree
+
+Since the drafting of the preprint two new models have been added **AF** and **LLM** from [Garg & Hochberg, 2024](https://www.biorxiv.org/content/10.1101/2024.09.19.613819v3). They work exactly as **3Di** but with new substiution matrixes (available in `resources/subst_matrixes/`).
+
+To finally run the pipeline you can simply run this command and monitor that everything is more or less running fine.
 
 ```
-snakemake --configfile config/test.yaml -p -j2 -k --sdm conda
+snakemake --configfile config/example_phylome.yaml -p -j2 -k --sdm conda
 ```
 
-###  1.4. <a name='Outputs'></a>Outputs
+The most important output files will be these two: 
 
 * `results/{dataset}/trees/{seed}_unrooted_trees.txt`: has 5 columns (gene ID, target set, alphabet, model and tree text). This file is easily parsable in R or Python to do further analyses. You can find some R scripts to do that in `workflow/scripts/` 
-* `results/{dataset}/plots/{seed}*pdf`: here you will find various plot that should inform you about the homology search and tree reconstruction quality.
-* `results/data`: here you will find very useful files for specific downstream analyses including the fastas and a cif file, a prediction file and the PAE file per protein. You will also find a `gffs` folder where uniprot gffs are stored and a `cath` folder where each proteome has a file that connects protein id to Pfam and Gene3D entries. In the `ids` folder you can also see various phylogenomic useful links in case you would like to benchmark with different homology sets as inferred by OMA, EggNOG or PhylomeDB (among others).
-<!-- * `results/{dataset}/homology/{seed}_{method}_brh.tsv`: these files are not used in automatic downstream analyses but may be useful for some further exploration of the results. -->
+* `results/{dataset}/trees/{seed}_mltrees.txt`: results of IQ-Tree model selection. 
 
 # Contribute
+
+This modular pipeline was born with the idea to be easily expandable as so many new structural phylogenetics tools are being released each month. Feel free to contribute or open an issue!
