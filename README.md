@@ -41,10 +41,9 @@ To run the pipeline the user will need to prepare these files:
 3. `species_tree`: The corresponding species tree in newick format
 4. `configfile`: A `yaml` file with different parameters
 
-The pipeline can be run in two distinct modes: *Phylome* and *OG*. For the first approach, the user only needs to input a list of protein IDs of the seed species (indicated by `seed: UniProt_id` in the `configfile`). Each protein will be aligned to the structures and sequences of the different taxas indicated in the `metadata` file. Alternatively, if the user already has defined orthogroups the homology search step is skipped and the different trees will be computed on these sets.
+The pipeline can be run in two distinct modes: *Phylome* and *OG*. For the first approach, the user only needs to input a list of protein IDs of the seed species (indicated by `seed: UniProt_id` in the `configfile`). Each protein will be aligned to the structures and sequences of the different taxas indicated in the `metadata` file. Alternatively, if the user already has defined orthogroups the homology search step is skipped and the different trees will be computed on these sets. There are two example `yaml` files for both modes in `config/`.
 
 Importantly, global parameters that are likely to be used across different datasets are in `config/params.yaml`. Note that the values in the first custom yaml are prioritary to the ones in this `params.yaml`! However, it is mandatory that the `configfile` has these fields:
-
 
 ```yaml
 # these will be the prefix of the output directory in results/homology
@@ -73,15 +72,16 @@ You can change the directory where all these data are stored with `params["data_
 
 ###  1.3. <a name='Phylogenypipeline'></a>Phylogeny pipeline
 
+!(Main snakemake pipeline)["resources/dags/structpipe.png"]
+
 To run the actual pipeline you just need as input the species tree and the previous uniprot table file. Once you have these you can decide the target sets and the methodological implementations that you'd like to explore:
 
 ```yaml
 combinations: ["3Di_3Di", "aa_FM_", "aa_LG", "3Di_GTR", "3Di_FT", "3Di_LLM", "3Di_AF"]
-#, "3Di_FTPY"]
 # Subset of the first one that requires ML 
 combinations_ML: ["3Di_3Di", "aa_LG", "3Di_GTR", "3Di_LLM", "3Di_AF"]
+modes: ['blast', 'fs', 'common', 'union']
 ```
-<!-- modes: ['blast', 'fs', 'common', 'union'] -->
 
 Another important parameter is the `seed`. You can specify one or a list of many (although this feature is more or less untested) and the pipeline will create one output per seed species.
 
@@ -98,23 +98,4 @@ snakemake --configfile config/test.yaml -p -j2 -k --sdm conda
 * `results/data`: here you will find very useful files for specific downstream analyses including the fastas and a cif file, a prediction file and the PAE file per protein. You will also find a `gffs` folder where uniprot gffs are stored and a `cath` folder where each proteome has a file that connects protein id to Pfam and Gene3D entries. In the `ids` folder you can also see various phylogenomic useful links in case you would like to benchmark with different homology sets as inferred by OMA, EggNOG or PhylomeDB (among others).
 <!-- * `results/{dataset}/homology/{seed}_{method}_brh.tsv`: these files are not used in automatic downstream analyses but may be useful for some further exploration of the results. -->
 
-# TODOs
-
-* update README
-* Why DL is different in union and foldseek
-
-# DONE
-
-* implement notebook instead of scripts to plot that can take both eggnoglike or phylomedb.
-* Correlation between RF and average pLDDT of a tree
-* Run OMA benchmark at eukaryotic level and compute TCS and our metrics: https://github.com/DessimozLab/fold_tree?tab=readme-ov-file#benchmarking-experiments YOU HAVE A PROPER CONDA ENVIRONMENT NAMED foldtree TO DO THIS! (Ran on my workstation as you need internet)
-* Check that everything is alright in the two test seeds. 
-* Do a proper eggnog and oma benchmark
-* Agree on final set of models
-* check overlap of blast and foldseek sets with various orthologous sets
-* Better representation of CATH and Pfam analysis
-* Switch from quicktree to FastME
-* 3di + aa: finish rules for partition and add pipeline to the schema -> combination= {comb_part}
-* use list of seeds as input.
-* replace X with - when masking characters
-* File structure is a bit complicated and there is a bit of redundancy, for example rerunning blast everytime or the metadata: done
+# Contribute
