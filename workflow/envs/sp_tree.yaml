@@ -1,3 +1,4 @@
+name: sp_tree
 channels:
   - bioconda
   - conda-forge
@@ -9,3 +10,7 @@ dependencies:
   - fastme
   - trimal
   - foldmason
+  - csvtk
+  - seqkit
+  - quicktree
+  - seqtk

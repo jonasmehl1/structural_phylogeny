@@ -1,3 +1,4 @@
+name: reco
 channels:
   - bioconda
   - conda-forge
@@ -6,3 +7,6 @@ dependencies:
   - newick_utils
   - gxx
   - treeswift
+  - csvtk
+  - seqkit
+  - seqtk

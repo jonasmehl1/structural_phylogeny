@@ -1,4 +1,8 @@
 # PARAMS
+input_dir: "JASSY_structs"
+
+data_dir: 'JASSY/data/'
+outdir: 'JASSY'
 
 # Download pipeline, exclude structures with mean pLDDT lower than X
 low_confidence: 40
@@ -6,12 +10,20 @@ low_confidence: 40
 min_len: 0
 
 # possible methodological combination. You can exclude whichever
-combinations: ["3Di_3Di", "aa_FM", "aa_LG", "3Di_GTR", "3Di_FT", "comb_part", "3Di_LLM", "3Di_AF"] #, "3Di_FTPY"]
+
+alphabets: ["aa", "3Di"]
+
+models: ["GTR", "LG", "3Di", "LLM", "AF"]
+
+combinations: ["3Di_3Di", "3Di_FT", "comb_part", "3Di_AF"] #, "3Di_FTPY"]
 # Subset of the first one that requires ML 
-combinations_ML: ["3Di_3Di", "aa_LG", "3Di_GTR", "comb_part", "3Di_LLM", "3Di_AF"]
+combinations_ML: ["3Di_3Di", "comb_part", "3Di_AF"]
+
+
 
 # Target sets, you can exclude whichever to reduce computations
-modes: ['blast', 'fs', 'common', 'union']
+# modes: ['blast', 'fs', 'common', 'union']
+modes: ['union']
 # Which target set will be used in foldmason examples
 foldmason_set: 'union'
 # Number of foldmason examples
@@ -42,10 +54,9 @@ distboot: 100
 
 # files and folders
 subst_matrix: 
-  aln: 'resources/subst_matrixes/mat3di.out'
-  3di: 'resources/subst_matrixes/3DI.nexus'
-  LLM: 'resources/subst_matrixes/Q_mat_LLM_Garg.txt'
-  AF: 'resources/subst_matrixes/Q_mat_AF_Garg.txt'
+  aln: 'data/subst_matrixes/mat3di.out'
+  3di: 'data/subst_matrixes/3DI.nexus'
+  LLM: 'data/subst_matrixes/Q_mat_LLM_Garg.txt'
+  AF: 'data/subst_matrixes/Q_mat_AF_Garg.txt'
 
-data_dir: 'results/data/'
-outdir: 'results/'
+

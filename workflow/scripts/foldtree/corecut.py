@@ -3,6 +3,7 @@ import Bio.PDB
 import numpy as np
 import os
 import tqdm
+import sys
 
 def extract_core(resdf, outfile,  hitthresh = .8, minthresh = .6, corefolder = 'core_structs/', structfolder = 'structs/', cterfolder = 'cter_structs/' , nterfolder = 'nter_structs/'):
 	"""
@@ -75,12 +76,28 @@ def extract_core(resdf, outfile,  hitthresh = .8, minthresh = .6, corefolder = '
 	# except:
 	# 	print(nterfolder , 'folder already present')
 	
-	#parse each struct and output core to folder 
-	parser = Bio.PDB.MMCIFParser()
+	#parse each struct and output core to folder
+	cif_parser = Bio.PDB.MMCIFParser(QUIET=True)  # Parser for .cif files
+	pdb_parser = Bio.PDB.PDBParser(QUIET=True)
+
 	with tqdm.tqdm(total=len(hits)) as pbar:
 		for i,q in enumerate(hits):
-			struct = parser.get_structure(q.split('.')[0], structfolder+q)
-			outstruct = q.replace('.cif', '.core.pdb')
+
+			# Determine file paths
+			pdb_file = os.path.join(structfolder, q + ".pdb")
+			cif_file = os.path.join(structfolder, q + ".cif")
+
+			# Check which file exists
+			if os.path.exists(pdb_file):
+				parser = pdb_parser
+				struct_file = pdb_file
+
+			elif os.path.exists(cif_file):
+				parser = cif_parser
+				struct_file = cif_file
+
+			struct = parser.get_structure(q, struct_file)
+			outstruct = q.replace('.cif', '').replace('.pdb', '') + ".core.pdb"
 			#zero based indexing...
 			Bio.PDB.Dice.extract(struct, 'A', hits[q]['min']+1, hits[q]['max']+1, corefolder+outstruct)
 			

@@ -5,6 +5,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import os
+import sys
 
 def structblob2tree(input_folder, outfolder, tmpfolder, corefolder, outtree, 
                     overwrite = False, correction = False,
@@ -37,12 +38,14 @@ def structblob2tree(input_folder, outfolder, tmpfolder, corefolder, outtree,
     '''
     #check if the foldseek output is already there
     input_folder = os.path.join(input_folder, '')
+
     if os.path.exists(outfolder + '_allvall.tsv') and overwrite == False:
         print('found foldseek output, skipping foldseek')
         alnres = outfolder + '_allvall.tsv'
     else:
         alnres = foldseek2tree.runFoldseek_allvall_EZsearch(input_folder, outfolder + '_allvall.tsv', tmpfolder, foldseekpath = foldseekpath)
-    
+
+    print(f"{alnres}", file=sys.stderr, flush=True)
     if core == True:
         corefolder = os.path.join(corefolder, '')
         corecut.extract_core(alnres, outfolder+'.core',  hitthresh = hitthresh, minthresh = minthresh, 
@@ -129,7 +132,7 @@ if __name__ == '__main__':
     # flag_dict['foldseekpath'] = args.foldseekpath
     # flag_dict['delta'] = args.delta
     # flag_dict['kernel'] = args.kernel
-    print(f"struct dir: {args.struct_dir}, output dir: {args.output_dir}")
+
     structblob2tree(args.struct_dir, args.output_dir, args.tmp_dir, args.core_dir, args.outtree,
                     overwrite = args.overwrite, correction = args.correction,
                     delta = args.delta, kernel = args.kernel, 

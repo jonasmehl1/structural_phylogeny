@@ -1,3 +1,4 @@
+name: sp_python
 channels:
   - bioconda
   - conda-forge
@@ -12,3 +13,6 @@ dependencies:
   - statsmodels
   - toytree[version='<3']
   - tqdm
+  - csvtk
+  - seqkit
+  - foldseek

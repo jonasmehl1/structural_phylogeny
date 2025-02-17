@@ -1,3 +1,4 @@
+name: sp_R
 channels:
   - bioconda
   - conda-forge

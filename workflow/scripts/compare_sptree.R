@@ -31,6 +31,8 @@ disco_fls <- c(snakemake@input[["disco"]])
 clades <- read_delim(snakemake@input[["table"]], show_col_types = FALSE)
 
 apro_files <- snakemake@input[["apro_trees"]]
+print('Apro Files /n')
+print(apro_files)
 apro_trees <- read.tree(text = sapply(apro_files, readLines))
 names(apro_trees) <- sapply(str_split(basename(apro_files), "_"), 
                             function(x) paste0(x[2], "_", x[4]))

@@ -2,5 +2,5 @@ keep-going: true
 rerun-incomplete: true
 printshellcmds: true
 sdm: conda
-conda-prefix: "/gpfs/projects/bsc40/current/gmutti/software/conda/structural/"
+conda-prefix: "/home/jonasm/miniforge3/envs/"
 

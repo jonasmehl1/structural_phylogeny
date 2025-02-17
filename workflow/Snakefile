@@ -1,46 +1,50 @@
+# Overall this snakemake file is a modified version of the original one, which keeps the relevant steps but gets rid of the non applicable stuff (Astral and Notung support, blast vs foldseek and much more).
+
 import glob
 import pandas as pd
 import snakemake.utils
 
-# User-specified dataset-specific config file
-dataset_config_file = config.get("dataset_config_file", None)
-
 # Load fixed config parameters
 configfile: "config/params.yaml"
 
-# Check if the dataset-specific config file is provided
-if dataset_config_file is not None:
-    # Load dataset-specific parameters
-    configfile: dataset_config_file
+# get the input directory
+input_dir = config["input_dir"]
+output_dir = config["outdir"]
+combinations_ML = config["combinations_ML"]
 
+# Here only the rule make_fastas that exctracts the fast sequence from pdb file is of interest
 # include: 'rules/prepare.smk'
-# include: 'rules/structure.smk'
+# This contains the rules for foldseek
+include: 'rules/structure.smk'
+# This constructs blast databases used for searching, unclear if i need this
 # include: 'rules/sequence.smk'
-include: 'rules/checks.smk'
+# Some stuff here might be useful, some not
+# include: 'rules/checks.smk'
+# Makes alignments and actually runs the trees
 include: 'rules/common.smk'
-include: 'rules/analysis.smk'
+# mainly for plotting, probably not needed
+# include: 'rules/analysis.smk'
 
-
-input_table = pd.read_csv(config['taxids'], sep='\t')
-input_table.columns = ['uniprot', 'taxid', 'mnemo']
-input_dict = input_table.set_index('uniprot').T.to_dict()
-
-codes = list(input_table['uniprot'])
-
-homodir=config['outdir']+'homology/'+config['homology_dataset']
-outdir=config['outdir']+'phylogeny/'+config['phylo_dataset']
-
-# possible combinations:
-combinations_codes_str=[x+"_"+y for x in codes for y in codes]
-
-# for the plots you need to work a bit on adapting to new nonphylome method
-plots = ["discordance"] # "runtime", "astral_pro", "trees", "discordance", "examples", "distance"
 
 rule all:
     input:
-        expand(outdir+"/plots/{seed}_{plot}.pdf", seed=config['seed'], plot=plots),
-        expand(outdir+"/plots/{seed}_foldmason", seed=config['seed']),
-        expand(outdir+"/trees/{seed}_{mode}_trees.txt", seed=config['seed'], mode=config["modes"])
-        # expand(outdir+"/reco/{seed}_notung.tsv", seed=config['seed']),
-        # expand(outdir+"/trees/{seed}_mltrees.txt", seed=config['seed'])
+        # ✅ Filtered homologs (if needed)
+        f"{output_dir}/foldseek/results/filtered_homologs.tsv",
+
+        # ✅ Foldmason Report
+        f"{output_dir}/foldtree/foldmason_report/foldmason_alignment_3Di.html",
+
+        # ✅ FoldTree Results
+        f"{output_dir}/foldtree/foldtree_3Di_FT.nwk",
+        f"{output_dir}/foldtree/fastme/foldtree_3Di_FM.nwk",
+        f"{output_dir}/foldtree/foldtree_py/foldtree_3Di_FTPY.nwk",
+
+        # IQ-TREE results for each alphabet and model
+        expand(f"{output_dir}/phylogeny/iqtree/{{alphabet}}/{{model}}.nwk",
+            alphabet=["aa", "3Di"],
+            model=config["models"]),
+
+        # Partitioned IQ-TREE results using comb_model from config
+        expand(f"{output_dir}/phylogeny/iqtree_partitioned/{{comb_model}}.nwk",
+            comb_model=config["combinations_ML"])
 

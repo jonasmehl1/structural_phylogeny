@@ -78,28 +78,62 @@ rule untar_pdbs:
         ids=rules.download_uniprot_ids.output,
         files=rules.download_pdbs.output
     output:
-        cif=temp(directory(data_dir+'structures/{code}/cif')),
+        cif=directory(data_dir+'structures/{code}/cif'),
         pae=directory(data_dir+'structures/{code}/pae'),
         conf=directory(data_dir+'structures/{code}/confidence')
     shell:'''
-mkdir -p {output.cif}
-mkdir -p {output.pae}
-mkdir -p {output.conf}
+    set -e  # Exit on error
+    
+    mkdir -p {output.cif}
+    mkdir -p {output.pae}
+    mkdir -p {output.conf}
+    
+    for tarfile in {input.files}/*tar; do
+        ids=$(echo $tarfile | sed 's/.tar//')
+        
+        # Create the list file
+        tar --list --file=$tarfile | awk -F- 'NR == FNR {{ a[$0]; next }} $2 in a' {input.ids} /dev/stdin > ${{ids}}.txt
+        
+        if [[ $(wc -l <${{ids}}.txt) -ge 1 ]]; then
+            # Create filter files for both v3 and v4
+            grep "model_v4.cif.gz" ${{ids}}.txt > ${{ids}}_cif_v4.txt || true
+            grep "model_v3.cif.gz" ${{ids}}.txt > ${{ids}}_cif_v3.txt || true
+            
+            grep "predicted_aligned_error_v4.json.gz" ${{ids}}.txt > ${{ids}}_pae_v4.txt || true
+            grep "predicted_aligned_error_v3.json.gz" ${{ids}}.txt > ${{ids}}_pae_v3.txt || true
+            
+            grep "confidence_v4.json.gz" ${{ids}}.txt > ${{ids}}_conf_v4.txt || true
+            grep "confidence_v3.json.gz" ${{ids}}.txt > ${{ids}}_conf_v3.txt || true
+            
+            # Extract v4 files first
+            if [[ $(wc -l < ${{ids}}_cif_v4.txt) -ge 1 ]]; then
+                tar xvf $tarfile -C {output.cif} -T ${{ids}}_cif_v4.txt || {{ echo "CIF v4 extraction failed"; exit 1; }}
+            fi
+            
+            if [[ $(wc -l < ${{ids}}_pae_v4.txt) -ge 1 ]]; then
+                tar xvf $tarfile -C {output.pae} -T ${{ids}}_pae_v4.txt || {{ echo "PAE v4 extraction failed"; exit 1; }}
+            fi
+            
+            if [[ $(wc -l < ${{ids}}_conf_v4.txt) -ge 1 ]]; then
+                tar xvf $tarfile -C {output.conf} -T ${{ids}}_conf_v4.txt || {{ echo "Confidence v4 extraction failed"; exit 1; }}
+            fi
+            
+            # If no v4 files, extract v3 files
+            if [[ $(wc -l < ${{ids}}_cif_v4.txt) -eq 0 ]] && [[ $(wc -l < ${{ids}}_cif_v3.txt) -ge 1 ]]; then
+                tar xvf $tarfile -C {output.cif} -T ${{ids}}_cif_v3.txt || {{ echo "CIF v3 extraction failed"; exit 1; }}
+            fi
+            
+            if [[ $(wc -l < ${{ids}}_pae_v4.txt) -eq 0 ]] && [[ $(wc -l < ${{ids}}_pae_v3.txt) -ge 1 ]]; then
+                tar xvf $tarfile -C {output.pae} -T ${{ids}}_pae_v3.txt || {{ echo "PAE v3 extraction failed"; exit 1; }}
+            fi
+            
+            if [[ $(wc -l < ${{ids}}_conf_v4.txt) -eq 0 ]] && [[ $(wc -l < ${{ids}}_conf_v3.txt) -ge 1 ]]; then
+                tar xvf $tarfile -C {output.conf} -T ${{ids}}_conf_v3.txt || {{ echo "Confidence v3 extraction failed"; exit 1; }}
+            fi
+        fi
+    done
+    '''
 
-for tarfile in {input.files}/*tar; do
-
-    ids=$(echo $tarfile | sed 's/.tar//')
-    tar --list --file=$tarfile | awk -F- 'NR == FNR {{ a[$0]; next }} $2 in a' {input.ids} /dev/stdin > ${{ids}}.txt
-    if [[ $(wc -l <${{ids}}.txt) -ge 1 ]]; then
-        grep "model_v4.cif.gz" ${{ids}}.txt > ${{ids}}_cif.txt
-        grep "predicted_aligned_error_v4.json.gz" ${{ids}}.txt > ${{ids}}_pae.txt
-        grep "confidence_v4.json.gz" ${{ids}}.txt > ${{ids}}_conf.txt
-        tar xf $tarfile -C {output.cif} -T ${{ids}}_cif.txt
-        tar xf $tarfile -C {output.pae} -T ${{ids}}_pae.txt
-        tar xf $tarfile -C {output.conf} -T ${{ids}}_conf.txt
-    fi
-done
-'''
 
 
 rule move_lowconf:
@@ -121,11 +155,21 @@ for struct in {input.conf}/*json.gz; do
     protein=$(basename $struct | cut -f2 -d'-')
     avg_lddt=$(zcat $struct | jq '.confidenceScore |  add/length*1000 | round/1000')
     echo -e "$protein\\t$avg_lddt" >> {output.stats}
-
+    
+    # Try v4 first, then fall back to v3
+    if ls {input.cif}/AF-${{protein}}-F1-model_v4.cif.gz 1> /dev/null 2>&1; then
+        cif_file="AF-${{protein}}-F1-model_v4.cif.gz"
+    elif ls {input.cif}/AF-${{protein}}-F1-model_v3.cif.gz 1> /dev/null 2>&1; then
+        cif_file="AF-${{protein}}-F1-model_v3.cif.gz"
+    else
+        echo "No CIF file found for $protein" >&2
+        continue
+    fi
+    
     if (( $(echo "$avg_lddt < {params}" | bc -l) )); then
-        cp {input.cif}/AF-${{protein}}-F1-model_v4.cif.gz {output.low_dir}
+        cp {input.cif}/$cif_file {output.low_dir}
     else 
-        cp {input.cif}/AF-${{protein}}-F1-model_v4.cif.gz {output.high_dir}
+        cp {input.cif}/$cif_file {output.high_dir}
     fi
 done
 '''
@@ -133,12 +177,15 @@ done
 rule download_up_meta:
     input: sps=config["taxids"]
     output: data_dir+'meta/'+config["homology_dataset"]+'_uniprot_genomes.tsv'
-    shell: '''
-wget https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/STATS -O - | \
-tail -n +16 | sed 's/ //' | csvtk join -t -f "Tax_ID,Proteome_ID" {input.sps} - | cut -f1,2,3,7,9 | \
-taxonkit reformat -I 2 -f "{{k}}\\t{{p}}\\t{{c}}\\t{{o}}\\t{{f}}\\t{{g}}\\t{{s}}" | awk 'NR>1' | \
-csvtk add-header -t -n Proteome_ID,Tax_ID,mnemo,Assembly,Species_name,Kingdom,Phylum,Class,Order,Family,Genus,Species > {output}
-'''
+#    shell: '''
+#wget https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/STATS -O - | \
+#tail -n +16 | sed 's/ //' | csvtk join -t -f "Tax_ID,Proteome_ID" {input.sps} - | cut -f1,2,3,7,9 | \
+#taxonkit reformat -I 2 -f "{{k}}\\t{{p}}\\t{{c}}\\t{{o}}\\t{{f}}\\t{{g}}\\t{{s}}" | awk 'NR>1' | \
+#csvtk add-header -t -n Proteome_ID,Tax_ID,mnemo,Assembly,Species_name,Kingdom,Phylum,Class,Order,Family,Genus,Species > {output}
+#    '''
+    shell: """
+touch {output}
+"""
 
 
 rule get_gff:
