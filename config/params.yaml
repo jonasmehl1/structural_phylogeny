@@ -1,8 +1,8 @@
 # PARAMS
 # if you have predefined structures
-input_dir: "JASSY/structs"
+input_dir: "JASSY_new/structs"
 data_dir: 'data'
-outdir: 'JASSY'
+outdir: 'JASSY_new'
 
 # Foldtree options
 clean_folder: False
@@ -17,11 +17,15 @@ min_len: 0
 # possible methodological combination. You can exclude whichever
 
 alphabets: ["aa", "3Di"]
-models: [ "LG", "3Di",  "AF"] #, "LLM", "GTR"]
+models: ["LG", "3Di", "AF"] #, "LLM", "GTR"]
 
 combinations: ["3Di_3Di", "3Di_FT", "comb_part", "3Di_AF"] #, "3Di_FTPY"]
+# combinations: ["3Di_3Di", "aa_FM", "aa_LG", "3Di_GTR", "3Di_FT", "comb_part", "3Di_LLM", "3Di_AF"] #, "3Di_FTPY"]
 # Subset of the first one that requires ML 
+# combinations_ML: ["3Di_3Di", "aa_LG", "3Di_GTR", "comb_part", "3Di_LLM", "3Di_AF"]
 combinations_ML: ["3Di_3Di", "comb_part", "3Di_AF"]
+# which 3di ML method should be combined with the seqence based tree
+combs_3di: ["3Di","AF"]
 
 
 

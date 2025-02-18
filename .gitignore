@@ -4,10 +4,6 @@ test/
 launch_*.sh
 *Rproj*
 *Rhistory
-data/fastas/
-data/structures/
-data/ids/
-data/meta/*gz
 notebooks/prokaryote_sampling_cache/
 .Rproj.user
 logs/

@@ -48,19 +48,10 @@ rule mask_seqs_3Di:
     conda: "../envs/sp_python.yaml"
     script: "../scripts/mask_structures.py"
 
-rule struct_tmp_db:
-    input:
-        structs=config["input_dir"],
-        done=config["outdir"] + "/done.txt"
-    output: temp(directory("{output_dir}/alignment/tmp_struct_db"))
-    shell: '''
-    mkdir -p {output}
-    cp {input.structs}/*.pdb {output}/
-    '''
 
 rule foldmason:
     input:
-        db=rules.struct_tmp_db.output
+        db=config["input_dir"]
     output: "{output_dir}/alignment/aln_3Di/alignment.alg"
     log: "{output_dir}/alignment/aln_3Di/logs/foldmason_3Di.log"
     benchmark: "{output_dir}/alignment/aln_3Di/benchmarks/foldmason_3Di.txt"
@@ -95,30 +86,25 @@ rule concat_aln:
 rule iqtree:
     input: "{output_dir}/alignment/aln_{alphabet}/alignment.alg.clean"
     output:
-        tree="{output_dir}/phylogeny/iqtree/{alphabet}/{model}.nwk",
-        iqtree_output="{output_dir}/phylogeny/iqtree/{alphabet}/{model}.iqtree"
+        tree="{output_dir}/iqtree/{alphabet}/{model}.nwk",
+        iqtree_output="{output_dir}/iqtree/{alphabet}/{model}.iqtree"
     wildcard_constraints:
-        model="GTR|LG|3Di|LLM|AF",
-        alphabet="aa|3Di"
+        alphabet="aa|3Di",
+        model="LG|3Di|AF"
     params:
         threedi_submat=config['subst_matrix']['3di'],
-        LLM_submat=config['subst_matrix']['LLM'],
         AF_submat=config['subst_matrix']['AF'],
         ufboot=config['UF_boot']
-    log: "{output_dir}/phylogeny/iqtree/logs/{alphabet}_{model}.log"
-    benchmark: "{output_dir}/phylogeny/iqtree/benchmarks/{alphabet}_{model}.txt"
+    log: "{output_dir}/iqtree/logs/{alphabet}_{model}.log"
+    benchmark: "{output_dir}/iqtree/benchmarks/{alphabet}_{model}.txt"
     threads: 4
     conda: "../envs/sp_tree.yaml"
     shell: '''
-    tree_prefix={output_dir}/phylogeny/iqtree/{wildcards.alphabet}/{wildcards.model}
+    tree_prefix={output_dir}/iqtree/{wildcards.alphabet}/{wildcards.model}
 
     model={wildcards.model}
-    if [ "$model" == "GTR" ]; then
-        model="GTR20"
-    elif [ "$model" == "3Di" ]; then
+    if [ "$model" == "3Di" ]; then
         model="3DI -mdef {params.threedi_submat}"
-    elif [ "$model" == "LLM" ]; then
-        model={params.LLM_submat}
     elif [ "$model" == "AF" ]; then
         model={params.AF_submat}
     fi
@@ -130,14 +116,11 @@ rule iqtree:
     mv $tree_prefix.log {log}
     '''
 
-
-# --boot-trees
-
 rule get_part:
     input:
-        LG="{output_dir}/phylogeny/iqtree/aa/LG.iqtree",
-        ThreeDI="{output_dir}/phylogeny/iqtree/3Di/3Di.iqtree"
-    output: "{output_dir}/phylogeny/iqtree_partitioned/combined_partition.part"
+        LG="{output_dir}/iqtree/aa/LG.iqtree",
+        ThreeDI="{output_dir}/iqtree/3Di/{combs_3di}.iqtree"
+    output: "{output_dir}/iqtree_partitioned/{combs_3di}_combined_partition.part"
     shell: """
     model_LG=$(grep "^Model of substitution" {input.LG} | cut -f2 -d ':')
     model_3Di=$(grep "^Model of substitution" {input.ThreeDI} | cut -f2 -d ':')
@@ -154,32 +137,29 @@ rule get_part:
 rule iqtree_partitioned:
     input:
         fa="{output_dir}/alignment/concat_aln/concatenated_alignment.alg.clean",
-        part="{output_dir}/phylogeny/iqtree_partitioned/combined_partition.part"
+        part="{output_dir}/iqtree_partitioned/{combs_3di}_combined_partition.part"
     output:
-        tree="{output_dir}/phylogeny/iqtree_partitioned/{comb_model}.nwk",
-        iqtree="{output_dir}/phylogeny/iqtree_partitioned/{comb_model}.iqtree"
+        tree="{output_dir}/iqtree_partitioned/LG_{combs_3di}.nwk",
+        iqtree="{output_dir}/iqtree_partitioned/LG_{combs_3di}.iqtree"
     wildcard_constraints:
-        comb_model="3Di_3Di|comb_part|3Di_AF"
+        combs_3di="3Di|AF"
     params:
         threedi_submat=config['subst_matrix']['3di'],
-        LLM_submat=config['subst_matrix']['LLM'],
         AF_submat=config['subst_matrix']['AF'],
         ufboot=config['UF_boot']
-    log: "{output_dir}/phylogeny/iqtree_partitioned/logs/{comb_model}.log"
-    benchmark: "{output_dir}/phylogeny/iqtree_partitioned/benchmarks/{comb_model}.txt"
-    threads: 4
+    log: "{output_dir}/iqtree_partitioned/logs/LG_{combs_3di}.log"
+    benchmark: "{output_dir}/iqtree_partitioned/benchmarks/LG_{combs_3di}.txt"
+    threads: 32
     conda: "../envs/sp_tree.yaml"
     shell: """
-    tree_prefix={output_dir}/phylogeny/iqtree_partitioned/{wildcards.comb_model}
+    tree_prefix={output_dir}/iqtree_partitioned/LG_{wildcards.combs_3di}
 
-    iqtree2 -s {input.fa} -p {input.part} --prefix $tree_prefix -mdef {params.threedi_submat} -B {params.ufboot} -T {threads} --quiet
+    iqtree2 -s {input.fa} -p {input.part} --prefix $tree_prefix -mdef {params.threedi_submat} -B {params.ufboot} -T {threads} --quiet 
 
     mv $tree_prefix.treefile {output.tree}
     mv $tree_prefix.log {log}
     rm -f $tree_prefix.model.gz $tree_prefix.splits.nex $tree_prefix.contree $tree_prefix.ckp.gz
     """
-
-
 
 ##### FOLDTREE #####
 
@@ -197,13 +177,15 @@ rule foldmason_report:
     '''
 
 rule foldseek_allvall_tree:
-    input: rules.struct_tmp_db.output
+    input:
+        structs = config["input_dir"],
+        done=config["outdir"] + "/done.txt"
     output: "{output_dir}/foldtree/foldseek_allvall/foldseek_allvall.txt"
     log: "{output_dir}/foldtree/foldseek_allvall/logs/foldseek.log"
     benchmark: "{output_dir}/foldtree/foldseek_allvall/benchmarks/foldseek.txt"
     conda: "../envs/sp_homology.yaml"
     shell:'''
-    foldseek easy-search {input} {input} {output} $TMPDIR/foldseek_tmp \
+    foldseek easy-search {input.structs} {input.structs} {output} $TMPDIR/foldseek_tmp \
     --format-output 'query,target,fident,lddt,alntmscore' --exhaustive-search -e inf \
     --alignment-type 2 > {log}
     '''
@@ -225,44 +207,46 @@ rule foldtree:
         quicktree -i m {input} | paste -s -d '' > {output}
         '''
 
-rule foldtree_py:
-    input:
-        struct_db = rules.struct_tmp_db.output, \
-        foldseek_results = rules.foldseek_allvall_tree.output
-    output:
-        distmat="{output_dir}/foldtree/foldtree_py/foldtree_3Di_FTPY.txt",
-        tree="{output_dir}/foldtree/foldtree_py/foldtree_3Di_FTPY.nwk"
-    params: outdir="{output_dir}"
-    log: "{output_dir}/foldtree/foldtree_py/logs/foldtree_py.log"
-    conda: "../envs/sp_python.yaml"
-    shell: '''
-        indir=$(dirname {input.struct_db})
-        foldseek_output=$(dirname {input.foldseek_results})
-
-        python workflow/scripts/foldtree/foldtree.py -i {input.struct_db} -o {params.outdir}/foldtree/foldtree_py_output \
-        -t $TMPDIR --outtree {output.tree} -c {params.outdir}/foldtree/foldtree_py_core \
-        --corecut --correction --kernel fident > {log}
-
-        # Cleanup
-        rm -rf {params.outdir}/foldtree/foldtree_py_core
-        rm -f {output.distmat}_fastme_stat.txt {output.distmat}.tmp
-        rm -f {params.outdir}/foldtree/foldtree_py_allvall.tsv
-        rm -f {params.outdir}/foldtree/foldtree_py_core_allvall.tsv
-    '''
-
+# rule foldtree_py:
+#     input:
+#         struct_db = config["input_dir"], \
+#         foldseek_results = rules.foldseek_allvall_tree.output
+#     output:
+#         distmat="{output_dir}/foldtree/foldtree_py/foldtree_3Di_FTPY.txt",
+#         tree="{output_dir}/foldtree/foldtree_py/foldtree_3Di_FTPY.nwk"
+#     params: outdir="{output_dir}"
+#     log: "{output_dir}/foldtree/foldtree_py/logs/foldtree_py.log"
+#     conda: "../envs/sp_python.yaml"
+#     shell: '''
+#         indir=$(dirname {input.struct_db})
+#         foldseek_output=$(dirname {input.foldseek_results})
+#
+#         python workflow/scripts/foldtree/foldtree.py -i {input.struct_db} -o {params.outdir}/foldtree/foldtree_py_output \
+#         -t $TMPDIR --outtree {output.tree} -c {params.outdir}/foldtree/foldtree_py_core \
+#         --corecut --correction --kernel fident > {log}
+#
+#         # Cleanup
+#         rm -rf {params.outdir}/foldtree/foldtree_py_core
+#         rm -f {output.distmat}_fastme_stat.txt {output.distmat}.tmp
+#         rm -f {params.outdir}/foldtree/foldtree_py_allvall.tsv
+#         rm -f {params.outdir}/foldtree/foldtree_py_core_allvall.tsv
+#     '''
+#
+#
+# Run FASTME on the aa alignment
 
 rule convert_phylip:
-    input: "{output_dir}/foldtree/foldtree_py/foldtree_3Di_FTPY.txt"
-    output: temp("{output_dir}/foldtree/foldtree_py/foldtree_3Di_FTPY.phy")
+    input: "{output_dir}/alignment/aln_aa/alignment.alg.clean"
+    output: temp("{output_dir}/fastME/alignment.alg.clean.phy")
     conda: "../envs/sp_python.yaml"
     script: "../scripts/fasta2phylip.py"
 
 rule fastme:
     input: rules.convert_phylip.output
-    output: "{output_dir}/foldtree/fastme/foldtree_3Di_FM.nwk"
+    output: "{output_dir}/fastME/FM.nwk"
     params: config["distboot"]
-    log: "{output_dir}/foldtree/fastme/logs/fastme.log"
-    benchmark: "{output_dir}/foldtree/fastme/benchmarks/fastme.txt"
+    log: "{output_dir}/fastME/logs/fastme.log"
+    benchmark: "{output_dir}/fastME/benchmarks/fastme.txt"
     threads: 4
     conda: "../envs/sp_tree.yaml"
     shell: '''

@@ -28,28 +28,25 @@ include: 'rules/download_data.smk'
 
 rule all:
     input:
-        # create structures folder first
-        f"{output_dir}/structs",
         # download structures, wait for it to be done
         f"{output_dir}/done.txt",
 
-        # ✅ Filtered homologs (if needed)
+        # Filtered homologs (if needed)
         # f"{output_dir}/foldseek/results/filtered_homologs.tsv",
 
-        # ✅ Foldmason Report
+        # Foldmason Report
         f"{output_dir}/foldtree/foldmason_report/foldmason_alignment_3Di.html",
 
         # ✅ FoldTree Results
         f"{output_dir}/foldtree/foldtree_3Di_FT.nwk",
-        f"{output_dir}/foldtree/fastme/foldtree_3Di_FM.nwk",
-        f"{output_dir}/foldtree/foldtree_py/foldtree_3Di_FTPY.nwk",
+        
+        # fastME Results
+        f"{output_dir}/fastME/FM.nwk",
 
         # IQ-TREE results for each alphabet and model
-        expand(f"{output_dir}/phylogeny/iqtree/{{alphabet}}/{{model}}.nwk",
-            alphabet=["aa", "3Di"],
-            model=config["models"]),
+        expand(f"{output_dir}/iqtree/3Di/{{model}}.nwk", model=["3Di", "AF"]),  # 3Di and AF for 3Di alphabet
 
-        # Partitioned IQ-TREE results using comb_model from config
-        expand(f"{output_dir}/phylogeny/iqtree_partitioned/{{comb_model}}.nwk",
-            comb_model=config["combinations_ML"])
+        # Partitioned IQ-TREE results combining LG with both 3Di and AF
+        expand(f"{output_dir}/iqtree_partitioned/LG_{{combs_3di}}.nwk",
+               combs_3di=["3Di", "AF"])
 
