@@ -16,3 +16,10 @@ dependencies:
   - csvtk
   - seqkit
   - foldseek
+  - pip:
+    - tqdm
+    - wget
+    - numpy
+    - statsmodels
+    - toyplot
+    - requests

@@ -1,8 +1,13 @@
 # PARAMS
-input_dir: "JASSY_structs"
-
-data_dir: 'JASSY/data/'
+# if you have predefined structures
+input_dir: "JASSY/structs"
+data_dir: 'data'
 outdir: 'JASSY'
+
+# Foldtree options
+clean_folder: False
+custom_structs: False
+cath: False
 
 # Download pipeline, exclude structures with mean pLDDT lower than X
 low_confidence: 40
@@ -12,8 +17,7 @@ min_len: 0
 # possible methodological combination. You can exclude whichever
 
 alphabets: ["aa", "3Di"]
-
-models: ["GTR", "LG", "3Di", "LLM", "AF"]
+models: [ "LG", "3Di",  "AF"] #, "LLM", "GTR"]
 
 combinations: ["3Di_3Di", "3Di_FT", "comb_part", "3Di_AF"] #, "3Di_FTPY"]
 # Subset of the first one that requires ML 

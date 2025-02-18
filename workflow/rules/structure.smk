@@ -1,10 +1,12 @@
 rule make_foldseekdb:
-    input: config['input_dir']
+    input:
+        structs = config['input_dir'],
+        done = config["outdir"] + "/done.txt"
     output: "{output_dir}/foldseek/db/all_seqs_fsdb"
     threads: 8
     conda: "../envs/sp_homology.yaml"
     shell: '''
-    foldseek createdb --threads {threads} {input} {output}
+    foldseek createdb --threads {threads} {input.structs} {output}
     '''
 
 rule make_foldseekdb_seq:
@@ -17,33 +19,33 @@ rule make_foldseekdb_seq:
     sed -i 's/-model_v4.cif//g' {output}
     '''
 
-rule filter_foldseek:
-    input: "{output_dir}/foldseek/db/all_seqs_fsdb"
-    output: "{output_dir}/foldseek/results/filtered_homologs.tsv"
-    params:
-        eval_both=config['eval_both'],
-        coverage=config['coverage'],
-        max_seqs=config['max_seqs']
-    shell: '''
-    awk '$11<{params.eval_both} && $17*100>{params.coverage} && $18*100>{params.coverage}' {input} > {output}
-    '''
+# rule filter_foldseek:
+#     input: "{output_dir}/foldseek/db/all_seqs_fsdb"
+#     output: "{output_dir}/foldseek/results/filtered_homologs.tsv"
+#     params:
+#         eval_both=config['eval_both'],
+#         coverage=config['coverage'],
+#         max_seqs=config['max_seqs']
+#     shell: '''
+#     awk '$11<{params.eval_both} && $17*100>{params.coverage} && $18*100>{params.coverage}' {input} > {output}
+#     '''
 
-rule foldseek:
-    input:
-        q=config['input_dir'],
-        db=rules.make_foldseekdb.output
-    output:
-        "{output_dir}/foldseek/results/foldseek.tsv"
-    params: config['target_seqs']
-    log: "{output_dir}/foldseek/logs/foldseek.log"
-    benchmark: "{output_dir}/foldseek/benchmarks/foldseek.txt"
-    threads: 24
-    conda: "../envs/sp_homology.yaml"
-    shell: '''
-    foldseek easy-search {input.q} {input.db} {output} $TMPDIR/foldseek --threads {threads} --max-seqs {params} \
-    --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > {log}
-    sed -i 's/-model_v4.cif//g' {output}
-    '''
+# rule foldseek:
+#     input:
+#         q=config['input_dir'],
+#         db=rules.make_foldseekdb.output
+#     output:
+#         "{output_dir}/foldseek/results/foldseek.tsv"
+#     params: config['target_seqs']
+#     log: "{output_dir}/foldseek/logs/foldseek.log"
+#     benchmark: "{output_dir}/foldseek/benchmarks/foldseek.txt"
+#     threads: 24
+#     conda: "../envs/sp_homology.yaml"
+#     shell: '''
+#     foldseek easy-search {input.q} {input.db} {output} $TMPDIR/foldseek --threads {threads} --max-seqs {params} \
+#     --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,lddt,alntmscore,rmsd,prob,qcov,tcov > {log}
+#     sed -i 's/-model_v4.cif//g' {output}
+#     '''
 
 rule foldseek_allvall:
     input:

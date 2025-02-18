@@ -24,12 +24,17 @@ include: 'rules/structure.smk'
 include: 'rules/common.smk'
 # mainly for plotting, probably not needed
 # include: 'rules/analysis.smk'
-
+include: 'rules/download_data.smk'
 
 rule all:
     input:
+        # create structures folder first
+        f"{output_dir}/structs",
+        # download structures, wait for it to be done
+        f"{output_dir}/done.txt",
+
         # ✅ Filtered homologs (if needed)
-        f"{output_dir}/foldseek/results/filtered_homologs.tsv",
+        # f"{output_dir}/foldseek/results/filtered_homologs.tsv",
 
         # ✅ Foldmason Report
         f"{output_dir}/foldtree/foldmason_report/foldmason_alignment_3Di.html",

@@ -1,11 +1,10 @@
 rule get_seqs_aa:
     input:
-        pdb_files=config['input_dir']
+        pdb_files=config['input_dir'],
+        done=config["outdir"] + "/done.txt"
     output: "{output_dir}/alignment/get_seqs_aa/processed_sequences.fa"
-    conda: "../envs/sp_utils.yaml"
-    shell: '''
-    seqkit seq {input.pdb_files}*.pdb > {output}
-    '''
+    conda: "../envs/sp_python.yaml"
+    script: "../scripts/structs2fasta.py"
 
 # rule get_seqs_aa:
 #     input:
@@ -50,11 +49,13 @@ rule mask_seqs_3Di:
     script: "../scripts/mask_structures.py"
 
 rule struct_tmp_db:
-    input: config["input_dir"]
+    input:
+        structs=config["input_dir"],
+        done=config["outdir"] + "/done.txt"
     output: temp(directory("{output_dir}/alignment/tmp_struct_db"))
     shell: '''
     mkdir -p {output}
-    cp {input}/*.pdb {output}/
+    cp {input.structs}/*.pdb {output}/
     '''
 
 rule foldmason:
@@ -123,7 +124,7 @@ rule iqtree:
     fi
 
     iqtree2 -s {input} --prefix $tree_prefix -B {params.ufboot} -T {threads} --quiet \
-    --mem 4G --cmin 4 --cmax 10 --mset $model
+    --mem 16G --cmin 4 --cmax 10 --mset $model
 
     mv $tree_prefix.treefile {output.tree}
     mv $tree_prefix.log {log}
@@ -169,7 +170,7 @@ rule iqtree_partitioned:
     threads: 4
     conda: "../envs/sp_tree.yaml"
     shell: """
-    tree_prefix={output_dir}/phylogeny/iqtree_partitioned/{comb_model}
+    tree_prefix={output_dir}/phylogeny/iqtree_partitioned/{wildcards.comb_model}
 
     iqtree2 -s {input.fa} -p {input.part} --prefix $tree_prefix -mdef {params.threedi_submat} -B {params.ufboot} -T {threads} --quiet
 
