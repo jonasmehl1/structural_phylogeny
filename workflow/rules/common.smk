@@ -6,18 +6,6 @@ rule get_seqs_aa:
     conda: "../envs/sp_python.yaml"
     script: "../scripts/structs2fasta.py"
 
-# rule get_seqs_aa:
-#     input:
-#         pdb_files=config['input_dir']
-#     output: "{output_dir}/alignment/get_seqs_aa/processed_sequences.fa"
-#     conda: "../envs/sp_utils.yaml"
-#     params: config['min_len']
-#     threads: 8
-#     conda: "../envs/sp_python.yaml"
-#     shell:'''
-#     python workflow/scripts/cif2fasta.py -i {input} -o {output} -c {threads} -l {params}
-#     '''
-
 rule aln_aa:
     input: rules.get_seqs_aa.output
     output: "{output_dir}/alignment/aln_aa/alignment.alg"
@@ -51,14 +39,15 @@ rule mask_seqs_3Di:
 
 rule foldmason:
     input:
-        db=config["input_dir"]
+        db=config["input_dir"],
+        done=config["outdir"] + "/done.txt"
     output: "{output_dir}/alignment/aln_3Di/alignment.alg"
     log: "{output_dir}/alignment/aln_3Di/logs/foldmason_3Di.log"
     benchmark: "{output_dir}/alignment/aln_3Di/benchmarks/foldmason_3Di.txt"
     threads: 4
     conda: "../envs/sp_tree.yaml"
     shell: '''
-    foldmason easy-msa --threads {threads} {input} {output}.tmp {output_dir}/alignment/aln_3Di/foldmason_tmp > {log}
+    foldmason easy-msa --threads {threads} {input.db} {output}.tmp {output_dir}/alignment/aln_3Di/foldmason_tmp > {log}
     mv {output}.tmp_3di.fa {output}
     '''
 
@@ -97,7 +86,7 @@ rule iqtree:
         ufboot=config['UF_boot']
     log: "{output_dir}/iqtree/logs/{alphabet}_{model}.log"
     benchmark: "{output_dir}/iqtree/benchmarks/{alphabet}_{model}.txt"
-    threads: 4
+    threads: 8
     conda: "../envs/sp_tree.yaml"
     shell: '''
     tree_prefix={output_dir}/iqtree/{wildcards.alphabet}/{wildcards.model}
@@ -149,7 +138,7 @@ rule iqtree_partitioned:
         ufboot=config['UF_boot']
     log: "{output_dir}/iqtree_partitioned/logs/LG_{combs_3di}.log"
     benchmark: "{output_dir}/iqtree_partitioned/benchmarks/LG_{combs_3di}.txt"
-    threads: 32
+    threads: 8
     conda: "../envs/sp_tree.yaml"
     shell: """
     tree_prefix={output_dir}/iqtree_partitioned/LG_{wildcards.combs_3di}

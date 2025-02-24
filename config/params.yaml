@@ -1,8 +1,8 @@
 # PARAMS
 # if you have predefined structures
-input_dir: "JASSY_new/structs"
+input_dir: "OEP_results/TDG4/structs"
 data_dir: 'data'
-outdir: 'JASSY_new'
+outdir: 'OEP_results/TDG4'
 
 # Foldtree options
 clean_folder: False

@@ -41,9 +41,10 @@ rule all:
         f"{output_dir}/foldtree/foldtree_3Di_FT.nwk",
         
         # fastME Results
-        f"{output_dir}/fastME/FM.nwk",
+        #f"{output_dir}/fastME/FM.nwk",
 
         # IQ-TREE results for each alphabet and model
+        f"{output_dir}/iqtree/aa/LG.iqtree",
         expand(f"{output_dir}/iqtree/3Di/{{model}}.nwk", model=["3Di", "AF"]),  # 3Di and AF for 3Di alphabet
 
         # Partitioned IQ-TREE results combining LG with both 3Di and AF
