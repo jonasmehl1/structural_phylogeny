@@ -35,19 +35,19 @@ rule all:
         # f"{output_dir}/foldseek/results/filtered_homologs.tsv",
 
         # Foldmason Report
-        f"{output_dir}/foldtree/foldmason_report/foldmason_alignment_3Di.html",
+        #f"{output_dir}/foldtree/foldmason_report/foldmason_alignment_3di.html",
 
         # ✅ FoldTree Results
-        f"{output_dir}/foldtree/foldtree_3Di_FT.nwk",
-        
+        f"{output_dir}/foldtree/foldtree_3di_FT.nwk",
+        # f"{output_dir}/foldtree/foldtree_py/foldtree_3di_FTPY.nwk"
         # fastME Results
         #f"{output_dir}/fastME/FM.nwk",
 
         # IQ-TREE results for each alphabet and model
         f"{output_dir}/iqtree/aa/LG.iqtree",
-        expand(f"{output_dir}/iqtree/3Di/{{model}}.nwk", model=["3Di", "AF"]),  # 3Di and AF for 3Di alphabet
+        expand(f"{output_dir}/iqtree/3di/{{model}}.nwk", model=["3di", "AF"]),  # 3di and AF for 3di alphabet
 
-        # Partitioned IQ-TREE results combining LG with both 3Di and AF
+        # Partitioned IQ-TREE results combining LG with both 3di and AF
         expand(f"{output_dir}/iqtree_partitioned/LG_{{combs_3di}}.nwk",
-               combs_3di=["3Di", "AF"])
+               combs_3di=["3di", "AF"])
 

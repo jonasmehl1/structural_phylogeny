@@ -1,8 +1,8 @@
 # PARAMS
 # if you have predefined structures
-input_dir: "OEP_results/TDG4/structs"
+input_dir: "Foldmason_results/JASSY/structs"
 data_dir: 'data'
-outdir: 'OEP_results/TDG4'
+outdir: 'Foldmason_results/JASSY'
 
 # Foldtree options
 clean_folder: False
@@ -24,8 +24,8 @@ combinations: ["3Di_3Di", "3Di_FT", "comb_part", "3Di_AF"] #, "3Di_FTPY"]
 # Subset of the first one that requires ML 
 # combinations_ML: ["3Di_3Di", "aa_LG", "3Di_GTR", "comb_part", "3Di_LLM", "3Di_AF"]
 combinations_ML: ["3Di_3Di", "comb_part", "3Di_AF"]
-# which 3di ML method should be combined with the seqence based tree
-combs_3di: ["3Di","AF"]
+# which 3Di ML method should be combined with the seqence based tree
+combs_3Di: ["3Di","AF"]
 
 
 
@@ -52,7 +52,7 @@ max_seqs: 150
 # how many minimum common targets to proceed with the tree
 min_common: 4
 
-# min lddt to mask residues in 3di alignments
+# min lddt to mask residues in 3Di alignments
 min_lddt: 50
 
 # Ultrafast bootstrap for iqtree
